@@ -1,0 +1,12 @@
+# Compilacion de firmware
+build/
+
+# KiCad: salidas temporales y archivos locales
+kicad/out/
+*.lck
+*.kicad_prl
+*-backups/
+fp-info-cache
+
+# Python
+__pycache__/
