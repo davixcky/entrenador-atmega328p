@@ -1,6 +1,6 @@
 # Exposición final — Entrenador ATmega328P
 
-Presentación en español: **17 diapositivas principales + 2 anexos**, aproximadamente **16–18 minutos** incluida la demostración. El enfoque principal es el firmware: estructura, registros, entradas, modos, temporización, interrupciones y programación. El hardware se explica en tres diapositivas breves: arquitectura, alimentación/reloj/RESET e interfaz de entradas y salidas. El esquema queda como anexo opcional. Incluye un reparto sugerido entre David Orozco, Jose Torres y Leo Rojas y notas para cada diapositiva.
+Presentación en español: **17 diapositivas principales + 2 anexos**, aproximadamente **16–18 minutos** incluida la demostración. El enfoque principal es el firmware: estructura, registros, entradas, modos, temporización, interrupciones y programación. El hardware se explica en tres diapositivas breves: arquitectura, alimentación/reloj/RESET e interfaz de entradas y salidas. El esquema queda como anexo opcional. Incluye notas para cada diapositiva; los nombres y el reparto de intervenciones quedan abiertos.
 
 ## Archivos para presentar
 
