@@ -11,6 +11,7 @@
  *   Potenciometro -> PC0 (A0)
  *   DIP switch SW1..SW4 -> PC1..PC4 (A1..A4), pull-up interna, cerrado = 1
  *   PD0/PD1 libres para el FTDI.
+ *   Pines sin uso (PB5/SCK, PC5, PD0/PD1 sin FTDI) con pull-up para que no queden al aire.
  *
  * Multiplexado: el Timer2 interrumpe cada 2 ms y enciende un grupo a la vez
  * (LEDs -> decenas -> unidades). Cada grupo se refresca a ~166 Hz.
@@ -24,13 +25,37 @@
 
 #include <avr/interrupt.h>
 
+// PCB 1: placa de una cara (kicad/). Para rutearla con menos puentes, cada segmento y cada
+// LED va a otra linea del bus (ver SEG_PERM / LED_PERM en kicad/tools/generar_esquematico.py).
+// PCB 0: protoboard, bit i del bus = segmento i = LEDi.
+#define PCB 1
+
+#if PCB
+const uint8_t BIT_SEG[8] = {1, 2, 0, 3, 4, 5, 6, 7};  // bit del bus de cada segmento a..dp
+const uint8_t BIT_LED[8] = {4, 3, 7, 1, 6, 5, 0, 2};  // bit del bus de cada LED0..LED7
+#else
+const uint8_t BIT_SEG[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+const uint8_t BIT_LED[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+#endif
+
 // Segmentos: bit0 = a, bit1 = b, ..., bit6 = g, bit7 = dp
 const uint8_t DIGITO[10] = {
   0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F
 };
 
-// Lo que muestra cada grupo: 0 = LEDs, 1 = decenas, 2 = unidades
+// Lo que sale por el bus en cada grupo (ya reordenado): 0 = LEDs, 1 = decenas, 2 = unidades
 volatile uint8_t pantalla[3];
+
+static uint8_t reordenar(uint8_t valor, const uint8_t *tabla) {
+  uint8_t bus = 0;
+  for (uint8_t i = 0; i < 8; i++)
+    if (valor & (1 << i)) bus |= (uint8_t)(1 << tabla[i]);
+  return bus;
+}
+
+static void mostrarLeds(uint8_t valor) {  // bit i = LEDi
+  pantalla[0] = reordenar(valor, BIT_LED);
+}
 
 static void escribirBus(uint8_t valor) {
   PORTD = (PORTD & 0x03) | (uint8_t)(valor << 2);  // bits 0..5 -> PD2..PD7
@@ -46,8 +71,18 @@ ISR(TIMER2_COMPA_vect) {
 }
 
 static void mostrarNumero(uint8_t n) {
-  pantalla[1] = DIGITO[(n / 10) % 10];
-  pantalla[2] = DIGITO[n % 10];
+  pantalla[1] = reordenar(DIGITO[(n / 10) % 10], BIT_SEG);
+  pantalla[2] = reordenar(DIGITO[n % 10], BIT_SEG);
+}
+
+// Promedio de 8 lecturas con histeresis de +-2: el valor no salta entre dos numeros
+static uint16_t leerPot() {
+  static uint16_t estable = 0;
+  uint16_t suma = 0;
+  for (uint8_t i = 0; i < 8; i++) suma += analogRead(A0);
+  uint16_t nuevo = suma / 8;
+  if (nuevo > estable + 2 || nuevo + 2 < estable || nuevo == 0 || nuevo == 1023) estable = nuevo;
+  return estable;
 }
 
 static uint8_t leerDip() {
@@ -59,6 +94,9 @@ void setup() {
   DDRB |= 0x1F;                // PB0..PB1 bus, PB2..PB4 seleccion
   DDRC &= ~0x1E;               // PC1..PC4 entradas
   PORTC |= 0x1E;               // pull-up interna del DIP switch
+  PORTB |= (1 << PB5);         // pines sin uso con pull-up (PB5 es SCK del ICSP)
+  PORTC |= (1 << PC5);
+  PORTD |= 0x03;               // PD0/PD1 con pull-up mientras no haya FTDI
 
   // Timer2 en modo CTC: 16 MHz / 256 / 125 = 500 Hz -> una interrupcion cada 2 ms
   cli();
@@ -75,7 +113,7 @@ void loop() {
   static int8_t sentido = 1;
   static unsigned long ultimo = 0;
 
-  uint16_t pot = analogRead(A0);              // 0..1023
+  uint16_t pot = leerPot();                   // 0..1023
   uint8_t dip = leerDip();
   uint16_t periodo = 50 + pot;                // 50..1073 ms para modos con tiempo
   bool toca = millis() - ultimo >= periodo;
@@ -84,17 +122,17 @@ void loop() {
   switch (dip & 0x03) {
     case 0: {                                  // ADC
       uint8_t nivel = (uint32_t)pot * 9 / 1024; // 0..8 LEDs encendidos
-      pantalla[0] = (uint8_t)((1u << nivel) - 1);
+      mostrarLeds((uint8_t)((1u << nivel) - 1));
       mostrarNumero((uint32_t)pot * 100 / 1024);
       break;
     }
     case 1:                                    // contador
       if (toca) cuenta = (cuenta + 1) % 100;
-      pantalla[0] = cuenta;
+      mostrarLeds(cuenta);
       mostrarNumero(cuenta);
       break;
     case 2:                                    // lectura del DIP
-      pantalla[0] = dip | (uint8_t)(dip << 4);
+      mostrarLeds(dip | (uint8_t)(dip << 4));
       mostrarNumero(dip);
       break;
     case 3:                                    // auto fantastico
@@ -103,7 +141,7 @@ void loop() {
         if (posicion == 0) sentido = 1;
         posicion += sentido;
       }
-      pantalla[0] = (uint8_t)(1 << posicion);
+      mostrarLeds((uint8_t)(1 << posicion));
       mostrarNumero(posicion + 1);
       break;
   }

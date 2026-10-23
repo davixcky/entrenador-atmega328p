@@ -12,11 +12,13 @@ En la protoboard, marcar cada conexion a medida que se hace.
 | [ ] | C4 | 100uF/16V | 1 | + (positivo) |
 | [ ] | C5 | 0.1uF | 1 |  |
 | [ ] | C6 | 0.1uF | 1 |  |
+| [ ] | D11 | 1N4148 | 1 | K |
 | [ ] | J2 | FTDI | 3 | VCC |
 | [ ] | J3 | ICSP | 2 | VCC |
 | [ ] | R1 | 1k | 1 |  |
 | [ ] | R2 | 10k | 1 |  |
 | [ ] | RV1 | 10k | 1 | 1 |
+| [ ] | TP4 | +5V | 1 | 1 |
 | [ ] | U1 | ATmega328P-PU | 7 | VCC |
 | [ ] | U1 | ATmega328P-PU | 20 | AVCC |
 | [ ] | U2 | LM7805 | 3 | OUT |
@@ -34,20 +36,24 @@ En la protoboard, marcar cada conexion a medida que se hace.
 | [ ] | C7 | 0.1uF | 2 |  |
 | [ ] | C8 | 22pF | 2 |  |
 | [ ] | C9 | 22pF | 2 |  |
+| [ ] | C11 | 10nF | 2 |  |
 | [ ] | D2 | LED ON | 1 | K |
 | [ ] | J1 | 9-12 V DC | 2 |  |
 | [ ] | J2 | FTDI | 1 | GND |
 | [ ] | J2 | FTDI | 2 | CTS |
 | [ ] | J3 | ICSP | 6 | GND |
+| [ ] | J4 | Bornera 9-12 V | 2 | Pin_2 |
 | [ ] | Q1 | 2N2222 | 1 | E |
 | [ ] | Q2 | 2N2222 | 1 | E |
 | [ ] | Q3 | 2N2222 | 1 | E |
 | [ ] | RV1 | 10k | 3 | 3 |
 | [ ] | SW1 | Pulsador | 1 | 1 |
-| [ ] | SW2 | DIP x4 | 5 |  |
-| [ ] | SW2 | DIP x4 | 6 |  |
-| [ ] | SW2 | DIP x4 | 7 |  |
-| [ ] | SW2 | DIP x4 | 8 |  |
+| [ ] | SW2 | DIP x4 | 1 |  |
+| [ ] | SW2 | DIP x4 | 2 |  |
+| [ ] | SW2 | DIP x4 | 3 |  |
+| [ ] | SW2 | DIP x4 | 4 |  |
+| [ ] | TP1 | GND | 1 | 1 |
+| [ ] | TP2 | GND | 1 | 1 |
 | [ ] | U1 | ATmega328P-PU | 8 | GND |
 | [ ] | U1 | ATmega328P-PU | 22 | GND |
 | [ ] | U2 | LM7805 | 2 | GND |
@@ -58,6 +64,7 @@ En la protoboard, marcar cada conexion a medida que se hace.
 |:-:|---|---|---:|---|
 | [ ] | D1 | 1N4007 | 2 | A |
 | [ ] | J1 | 9-12 V DC | 1 |  |
+| [ ] | J4 | Bornera 9-12 V | 1 | Pin_1 |
 
 ## VIN
 
@@ -66,6 +73,7 @@ En la protoboard, marcar cada conexion a medida que se hace.
 | [ ] | C1 | 100uF/25V | 1 | + (positivo) |
 | [ ] | C2 | 0.33uF | 1 |  |
 | [ ] | D1 | 1N4007 | 1 | K |
+| [ ] | TP3 | VIN | 1 | 1 |
 | [ ] | U2 | LM7805 | 1 | IN |
 
 ## LED_PWR
@@ -80,9 +88,12 @@ En la protoboard, marcar cada conexion a medida que se hace.
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
 | [ ] | C10 | 0.1uF | 2 |  |
+| [ ] | C11 | 10nF | 1 |  |
+| [ ] | D11 | 1N4148 | 2 | A |
 | [ ] | J3 | ICSP | 5 | ~{RST} |
 | [ ] | R2 | 10k | 2 |  |
 | [ ] | SW1 | Pulsador | 2 | 2 |
+| [ ] | TP6 | RESET | 1 | 1 |
 | [ ] | U1 | ATmega328P-PU | 1 | /RESET/PC6 |
 
 ## XTAL1
@@ -141,34 +152,35 @@ En la protoboard, marcar cada conexion a medida que se hace.
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
 | [ ] | RV1 | 10k | 2 | 2 |
+| [ ] | TP5 | POT | 1 | 1 |
 | [ ] | U1 | ATmega328P-PU | 23 | PC0 |
 
 ## DIP1
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | SW2 | DIP x4 | 1 |  |
+| [ ] | SW2 | DIP x4 | 8 |  |
 | [ ] | U1 | ATmega328P-PU | 24 | PC1 |
 
 ## DIP2
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | SW2 | DIP x4 | 2 |  |
+| [ ] | SW2 | DIP x4 | 7 |  |
 | [ ] | U1 | ATmega328P-PU | 25 | PC2 |
 
 ## DIP3
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | SW2 | DIP x4 | 3 |  |
+| [ ] | SW2 | DIP x4 | 6 |  |
 | [ ] | U1 | ATmega328P-PU | 26 | PC3 |
 
 ## DIP4
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | SW2 | DIP x4 | 4 |  |
+| [ ] | SW2 | DIP x4 | 5 |  |
 | [ ] | U1 | ATmega328P-PU | 27 | PC4 |
 
 ## BUS0
@@ -231,34 +243,34 @@ En la protoboard, marcar cada conexion a medida que se hace.
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | D3 | LED0 | 2 | A |
+| [ ] | D9 | LED6 | 2 | A |
 | [ ] | R3 | 220 | 2 |  |
-| [ ] | U3 | 5161AS DECENAS | 7 | A |
-| [ ] | U4 | 5161AS UNIDADES | 7 | A |
+| [ ] | U3 | 5161AS DECENAS | 4 | C |
+| [ ] | U4 | 5161AS UNIDADES | 4 | C |
 
 ## SEG_B
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | D4 | LED1 | 2 | A |
+| [ ] | D6 | LED3 | 2 | A |
 | [ ] | R4 | 220 | 2 |  |
-| [ ] | U3 | 5161AS DECENAS | 6 | B |
-| [ ] | U4 | 5161AS UNIDADES | 6 | B |
+| [ ] | U3 | 5161AS DECENAS | 7 | A |
+| [ ] | U4 | 5161AS UNIDADES | 7 | A |
 
 ## SEG_C
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | D5 | LED2 | 2 | A |
+| [ ] | D10 | LED7 | 2 | A |
 | [ ] | R5 | 220 | 2 |  |
-| [ ] | U3 | 5161AS DECENAS | 4 | C |
-| [ ] | U4 | 5161AS UNIDADES | 4 | C |
+| [ ] | U3 | 5161AS DECENAS | 6 | B |
+| [ ] | U4 | 5161AS UNIDADES | 6 | B |
 
 ## SEG_D
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | D6 | LED3 | 2 | A |
+| [ ] | D4 | LED1 | 2 | A |
 | [ ] | R6 | 220 | 2 |  |
 | [ ] | U3 | 5161AS DECENAS | 2 | D |
 | [ ] | U4 | 5161AS UNIDADES | 2 | D |
@@ -267,7 +279,7 @@ En la protoboard, marcar cada conexion a medida que se hace.
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | D7 | LED4 | 2 | A |
+| [ ] | D3 | LED0 | 2 | A |
 | [ ] | R7 | 220 | 2 |  |
 | [ ] | U3 | 5161AS DECENAS | 1 | E |
 | [ ] | U4 | 5161AS UNIDADES | 1 | E |
@@ -285,7 +297,7 @@ En la protoboard, marcar cada conexion a medida que se hace.
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | D9 | LED6 | 2 | A |
+| [ ] | D7 | LED4 | 2 | A |
 | [ ] | R9 | 220 | 2 |  |
 | [ ] | U3 | 5161AS DECENAS | 10 | G |
 | [ ] | U4 | 5161AS UNIDADES | 10 | G |
@@ -294,7 +306,7 @@ En la protoboard, marcar cada conexion a medida que se hace.
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | D10 | LED7 | 2 | A |
+| [ ] | D5 | LED2 | 2 | A |
 | [ ] | R10 | 220 | 2 |  |
 | [ ] | U3 | 5161AS DECENAS | 5 | DP |
 | [ ] | U4 | 5161AS UNIDADES | 5 | DP |

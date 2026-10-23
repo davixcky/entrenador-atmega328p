@@ -1,0 +1,30 @@
+** Drc report for entrenador-atmega328p.kicad_pcb **
+** Created on 2026-10-22T10:33:03 **
+** Report includes: Errors **
+
+** Found 3 DRC violations **
+[starved_thermal]: Thermal relief connection to zone incomplete (layer B.Cu; zone min spoke count 2; actual 1)
+    Local override; error
+    @(26.0000 mm, 26.0000 mm): Zone [GND] on B.Cu, priority 0
+    @(113.5000 mm, 65.0000 mm): PTH pad 1 [GND] of SW1
+[starved_thermal]: Thermal relief connection to zone incomplete (layer B.Cu; zone min spoke count 2; actual 1)
+    Local override; error
+    @(26.0000 mm, 26.0000 mm): Zone [GND] on B.Cu, priority 0
+    @(120.5000 mm, 57.5400 mm): PTH pad 2 [GND] of J2
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(121.5000 mm, 28.5000 mm): Footprint H2
+    @(117.0000 mm, 34.0000 mm): Footprint D3
+
+** Found 0 unconnected pads **
+
+** Found 0 Footprint errors **
+
+** Ignored checks **
+    - Footprint has no courtyard defined
+    - Track endpoint not centered on via
+    - Tuning profile track geometries
+    - Footprint doesn't match symbol's footprint filters
+    - Footprint component type doesn't match footprint pads
+
+** End of Report **

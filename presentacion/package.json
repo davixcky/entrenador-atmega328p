@@ -1,0 +1,20 @@
+{
+  "name": "presentacion-entrenador-atmega328p",
+  "private": true,
+  "scripts": {
+    "dev": "slidev",
+    "build": "slidev build",
+    "export": "slidev export --output presentacion-final.pdf",
+    "export:pptx": "slidev export --format pptx --output presentacion-final.pptx"
+  },
+  "devDependencies": {
+    "@slidev/cli": "53.0.0",
+    "@slidev/theme-default": "0.25.0",
+    "playwright-chromium": "1.64.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "markdown-it": "14.1.0"
+    }
+  }
+}

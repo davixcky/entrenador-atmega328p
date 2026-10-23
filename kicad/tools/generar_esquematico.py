@@ -2,12 +2,14 @@
 
 Uso: python3 generar_esquematico.py  ->  ../entrenador-atmega328p.kicad_sch
 
-Cada pin se conecta con un tramo corto de cable y una etiqueta de red (o un
-simbolo de alimentacion). Dos etiquetas con el mismo nombre son la misma red.
+Dentro de cada bloque los componentes se unen con cables siguiendo el camino de
+la senal; entre bloques se usan etiquetas de red (dos etiquetas con el mismo
+nombre son la misma red). Los puntos de union se calculan solos al guardar.
 """
 import math
 import os
 import uuid as uuidlib
+from collections import Counter
 
 from sexpr import Sym, dump, find, first, parse
 
@@ -126,7 +128,10 @@ class Sheet:
     def __init__(self):
         self.lib = {}
         self.items = []
+        self.wires = []
+        self.pin_pts = []
         self.pwr_n = 0
+        self.flg_n = 0
         self.nets = {}  # (ref, pin) -> red (para la verificacion)
 
     def libsym(self, libid):
@@ -136,13 +141,33 @@ class Sheet:
 
     # -- primitivas -------------------------------------------------------
     def wire(self, x1, y1, x2, y2):
-        self.items.append([S('wire'), [S('pts'), [S('xy'), x1, y1], [S('xy'), x2, y2]],
-                           [S('stroke'), [S('width'), 0], [S('type'), S('default')]],
-                           [S('uuid'), uid()]])
+        a, b = (round(x1, 4), round(y1, 4)), (round(x2, 4), round(y2, 4))
+        if a != b:
+            self.wires.append((a, b))
 
-    def junction(self, x, y):
-        self.items.append([S('junction'), [S('at'), x, y], [S('diameter'), 0],
-                           [S('color'), 0, 0, 0, 0], [S('uuid'), uid()]])
+    def cable(self, *pts):
+        """Cable por varios puntos: cable((x1, y1), (x2, y2), ...)."""
+        for a, b in zip(pts, pts[1:]):
+            self.wire(a[0], a[1], b[0], b[1])
+
+    def junctions(self):
+        """Union donde llegan 3 o mas extremos, o donde un extremo cae dentro de otro cable."""
+        count = Counter()
+        for a, b in self.wires:
+            count[a] += 1
+            count[b] += 1
+        for p in self.pin_pts:
+            if p in count:
+                count[p] += 1
+        out = {p for p, n in count.items() if n >= 3}
+        for a, b in self.wires:
+            for p in (a, b):
+                for c, d in self.wires:
+                    if c[0] == d[0] == p[0] and min(c[1], d[1]) < p[1] < max(c[1], d[1]):
+                        out.add(p)
+                    if c[1] == d[1] == p[1] and min(c[0], d[0]) < p[0] < max(c[0], d[0]):
+                        out.add(p)
+        return sorted(out)
 
     def no_connect(self, x, y):
         self.items.append([S('no_connect'), [S('at'), x, y], [S('uuid'), uid()]])
@@ -166,7 +191,8 @@ class Sheet:
         self.text(title, x1 + 1.27, y1 + 1.27, size=2, bold=True)
 
     # -- simbolos ---------------------------------------------------------
-    def symbol(self, libid, ref, value, x, y, r=0, footprint='', fields=None, hide_value=False):
+    def symbol(self, libid, ref, value, x, y, r=0, footprint='', fields=None, hide_value=False, mirror=False):
+        """mirror=True refleja el simbolo en x (pines de la izquierda pasan a la derecha); solo con r=0."""
         flat = self.libsym(libid)
         is_power = ref.startswith('#')
         props = []
@@ -187,16 +213,21 @@ class Sheet:
                 if just and r == 180:
                     just = just.replace('left', 'TMP').replace('right', 'left').replace('TMP', 'right')
                 props.append([S('property'), key, val, [S('at'), x + px, y + py, ang], effects(just, hidden)])
-        node = [S('symbol'), [S('lib_id'), libid], [S('at'), x, y, r], [S('unit'), 1],
+        node = [S('symbol'), [S('lib_id'), libid], [S('at'), x, y, r]] + ([[S('mirror'), S('y')]] if mirror else []) + [
+                [S('unit'), 1],
                 [S('exclude_from_sim'), S('no')], [S('in_bom'), S('no') if is_power else S('yes')],
                 [S('on_board'), S('no') if is_power else S('yes')], [S('dnp'), S('no')],
                 [S('uuid'), uid()]] + props
-        for num in lib_pins(flat):
+        pos = {}
+        for num, (lx, ly, _) in lib_pins(flat).items():
             node.append([S('pin'), num, [S('uuid'), uid()]])
+            px, py = rot(-lx if mirror else lx, -ly, r)
+            pos[num] = (round(x + px, 4), round(y + py, 4))
+            self.pin_pts.append(pos[num])
         node.append([S('instances'), [S('project'), PROJECT,
                                       [S('path'), '/' + ROOT_UUID, [S('reference'), ref], [S('unit'), 1]]]])
         self.items.append(node)
-        return flat
+        return flat, pos
 
     def power(self, kind, x, y, d):
         """Simbolo de alimentacion cuyo pin queda en (x, y), apuntando hacia d."""
@@ -207,20 +238,29 @@ class Sheet:
             r = {'U': 0, 'D': 180, 'L': 90, 'R': 270}[d]
         self.symbol('power:' + kind, '#PWR%02d' % self.pwr_n, kind, x, y, r)
 
+    def flag(self, x, y, d='U'):
+        """PWR_FLAG sobre un punto de cable (marca la red como alimentada para el ERC)."""
+        self.flg_n += 1
+        r = {'U': 0, 'D': 180, 'L': 90, 'R': 270}[d]
+        self.symbol('power:PWR_FLAG', '#FLG%02d' % self.flg_n, 'PWR_FLAG', x, y, r)
+
+    def net(self, name, *refpins):
+        """Registra una red dibujada con cables (para verificar_netlist.py)."""
+        for rp in refpins:
+            self.nets[rp] = name
+
     def part(self, libid, ref, value, x, y, r=0, footprint='', conns=None, stub=2.54, stubs=None,
-             fields=None, hide_value=False):
+             fields=None, hide_value=False, mirror=False):
         """Coloca un componente y conecta cada pin segun conns {pin: red}.
 
         red puede ser: 'GND', '+5V' (simbolo de alimentacion), 'NC' (sin conexion),
         None (el pin se conecta a mano con wire()) o un nombre de etiqueta.
         Devuelve {pin: (x, y)} con la posicion de cada pin.
         """
-        flat = self.symbol(libid, ref, value, x, y, r, footprint, fields, hide_value)
-        pos, done = {}, set()
+        flat, pos = self.symbol(libid, ref, value, x, y, r, footprint, fields, hide_value, mirror)
+        done = set()
         for num, (lx, ly, la) in lib_pins(flat).items():
-            px, py = rot(lx, -ly, r)
-            px, py = round(x + px, 4), round(y + py, 4)
-            pos[num] = (px, py)
+            px, py = pos[num]
             net = (conns or {}).get(num, None)
             if net is None:
                 continue
@@ -231,7 +271,8 @@ class Sheet:
             if (px, py) in done:
                 continue
             done.add((px, py))
-            ox, oy = rot(math.cos(math.radians(la + 180)), -math.sin(math.radians(la + 180)), r)
+            ox, oy = rot(math.cos(math.radians(la + 180)) * (-1 if mirror else 1),
+                         -math.sin(math.radians(la + 180)), r)
             d = DIRS[(round(ox), round(oy))]
             ln = (stubs or {}).get(num, stub)
             ex, ey = round(px + round(ox) * ln, 4), round(py + round(oy) * ln, 4)
@@ -244,15 +285,20 @@ class Sheet:
 
     # -- archivo ----------------------------------------------------------
     def save(self, path):
+        body = [[S('junction'), [S('at'), x, y], [S('diameter'), 0], [S('color'), 0, 0, 0, 0], [S('uuid'), uid()]]
+                for x, y in self.junctions()]
+        body += [[S('wire'), [S('pts'), [S('xy'), a[0], a[1]], [S('xy'), b[0], b[1]]],
+                  [S('stroke'), [S('width'), 0], [S('type'), S('default')]], [S('uuid'), uid()]]
+                 for a, b in self.wires]
         doc = [S('kicad_sch'), [S('version'), 20250114], [S('generator'), 'eeschema'],
                [S('generator_version'), '9.0'], [S('uuid'), ROOT_UUID], [S('paper'), 'A3'],
                [S('title_block'),
-                [S('title'), 'Entrenador de microcontroladores ATMega328P (DIP)'],
-                [S('date'), '2026-10-16'], [S('rev'), '1'],
-                [S('company'), 'Sistemas Embebidos 1 - Actividad 10.1.12'],
-                [S('comment'), 1, 'David Orozco, Jose Torres, Leo Rojas'],
-                [S('comment'), 2, 'Programacion: Arduino Uno como ISP por J3 (probado) - FTDI por J2 (opcional)']],
-               [S('lib_symbols')] + list(self.lib.values())] + self.items + [
+                [S('title'), 'Entrenador de microcontroladores ATmega328P (DIP)'],
+                [S('date'), '2026-10-22'], [S('rev'), '2'],
+                [S('company'), 'Universidad de la Costa (CUC) — Sistemas Embebidos 1'],
+                [S('comment'), 1, 'David Orozco · Jose Torres · Leo Rojas'],
+                [S('comment'), 2, 'Actividad 10.1.12 · PCB de una cara (tóner o CNC)']],
+               [S('lib_symbols')] + list(self.lib.values())] + body + self.items + [
             [S('sheet_instances'), [S('path'), '/', [S('page'), '1']]],
             [S('embedded_fonts'), S('no')]]
         with open(path, 'w', encoding='utf-8') as f:
@@ -265,13 +311,19 @@ class Sheet:
 FP_R = 'Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal'
 FP_C = 'Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm'
 FP_LED5 = 'LED_THT:LED_D5.0mm'
-FP_Q = 'Package_TO_SOT_THT:TO-92_Inline'
+FP_Q = 'Package_TO_SOT_THT:TO-92_Inline_Wide'
 
 HORIZ = {'Reference': (0, -2.54, None), 'Value': (0, 2.54, None)}
 VLED = {'Reference': (3.81, -1.27, None), 'Value': (3.81, 1.27, None)}
 VLED_L = {'Reference': (-3.81, -1.27, None), 'Value': (-6.35, 1.27, None)}
 
 SEG = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'DP']
+# Linea del bus (SEG_A..SEG_DP = salida de R3..R10 = bit 0..7) que va a cada segmento a..dp de
+# los displays y a cada LED0..LED7. El orden se eligio para rutear la PCB de una cara con menos
+# puentes (tools/generar_pcb.py, SEG_PERM / LED_PERM); el firmware lo compensa con tablas.
+SEG_PERM = '12034567'
+LED_PERM = '43716502'
+DISP_PIN = {'A': '7', 'B': '6', 'C': '4', 'D': '2', 'E': '1', 'F': '9', 'G': '10', 'DP': '5'}
 # bit del bus -> pin del MCU (PD0/PD1 quedan libres para el FTDI)
 BUS_PINS = ['PD2', 'PD3', 'PD4', 'PD5', 'PD6', 'PD7', 'PB0', 'PB1']
 
@@ -280,64 +332,161 @@ def build():
     sh = Sheet()
 
     # ---------------- Fuente ------------------------------------------------
-    sh.box(12.7, 15.24, 152.4, 96.52, 'FUENTE: entrada hasta 12 V, proteccion de polaridad y regulador 5 V')
-    sh.part('Connector:Barrel_Jack', 'J1', '9-12 V DC', 25.4, 50.8, footprint='Connector_BarrelJack:BarrelJack_Horizontal',
-            conns={'1': 'VIN_RAW', '2': 'GND'}, stubs={'1': 5.08, '2': 5.08})
-    sh.part('Diode:1N4007', 'D1', '1N4007', 50.8, 43.18, r=180,
-            footprint='Diode_THT:D_DO-41_SOD81_P10.16mm_Horizontal', conns={'2': 'VIN_RAW', '1': 'VIN'})
-    sh.part('Device:C_Polarized', 'C1', '100uF/25V', 66.04, 53.34, footprint='Capacitor_THT:CP_Radial_D8.0mm_P3.50mm',
-            conns={'1': 'VIN', '2': 'GND'})
-    sh.part('Device:C', 'C2', '0.33uF', 81.28, 53.34, footprint=FP_C, conns={'1': 'VIN', '2': 'GND'})
-    sh.part('Regulator_Linear:L7805', 'U2', 'LM7805', 104.14, 43.18,
-            footprint='Package_TO_SOT_THT:TO-220-3_Vertical', conns={'1': 'VIN', '2': 'GND', '3': '+5V'})
-    sh.part('Device:C', 'C3', '0.1uF', 124.46, 53.34, footprint=FP_C, conns={'1': '+5V', '2': 'GND'})
-    sh.part('Device:C_Polarized', 'C4', '100uF/16V', 132.08, 53.34, footprint='Capacitor_THT:CP_Radial_D6.3mm_P2.50mm',
-            conns={'1': '+5V', '2': 'GND'})
-    r1 = sh.part('Device:R', 'R1', '1k', 146.05, 43.18, footprint=FP_R, conns={'1': '+5V', '2': None})
-    d2 = sh.part('Device:LED', 'D2', 'LED ON', 146.05, 58.42, r=90, footprint='LED_THT:LED_D3.0mm',
-                 conns={'2': None, '1': 'GND'}, fields=VLED_L)
-    sh.wire(*r1['2'], *d2['2'])
-    sh.nets[('R1', '2')] = sh.nets[('D2', '2')] = 'LED_PWR'
-    sh.part('power:PWR_FLAG', '#FLG01', 'PWR_FLAG', 25.4, 73.66, conns={'1': 'VIN'}, stub=5.08)
-    sh.part('power:PWR_FLAG', '#FLG02', 'PWR_FLAG', 43.18, 73.66, conns={'1': 'GND'}, stub=5.08)
-    sh.text('D1 en serie: si el jack se conecta al reves no circula corriente.\n'
-            'Entrada minima ~7.7 V (2 V del 7805 + 0.7 V del diodo).\n'
+    # J1 -> D1 -> C1/C2 -> 7805 -> C3/C4 -> LED de encendido, todo en una sola linea
+    sh.box(12.7, 15.24, 152.4, 96.52, 'FUENTE: entrada hasta 12 V, protección de polaridad y regulador 5 V')
+    yr = 43.18
+    j1 = sh.part('Connector:Barrel_Jack', 'J1', '9-12 V DC', 22.86, yr + 2.54,
+                 footprint='Connector_BarrelJack:BarrelJack_Horizontal')
+    d1 = sh.part('Diode:1N4007', 'D1', '1N4007', 50.8, yr, r=180,
+                 footprint='Diode_THT:D_DO-41_SOD81_P10.16mm_Horizontal')
+    sh.cable(j1['1'], (33.02, yr), (38.1, yr), d1['2'])
+    sh.label('VIN_RAW', 33.02, yr, 'R')
+    sh.net('VIN_RAW', ('J1', '1'), ('D1', '2'))
+    xg = j1['2'][0] + 5.08
+    yf = j1['2'][1] + 5.08
+    sh.cable(j1['2'], (xg, j1['2'][1]), (xg, yf), (xg, yf + 5.08))
+    sh.power('GND', xg, yf + 5.08, 'D')
+    sh.cable((xg, yf), (xg + 5.08, yf))
+    sh.flag(xg + 5.08, yf, 'U')
+    sh.net('GND', ('J1', '2'))
+    # bornera en paralelo con el jack (antes de D1: la proteccion de polaridad cubre las dos)
+    j4 = sh.part('Connector:Screw_Terminal_01x02', 'J4', 'Bornera 9-12 V', 22.86, 66.04, mirror=True,
+                 footprint='TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal',
+                 fields={'Reference': (0, -5.08, None), 'Value': (-5.08, 7.62, 'right')})
+    xv = 38.1
+    sh.cable(j4['1'], (xv, j4['1'][1]), (xv, yr))
+    sh.cable(j4['2'], (30.48, j4['2'][1]), (30.48, j4['2'][1] + 5.08))
+    sh.power('GND', 30.48, j4['2'][1] + 5.08, 'D')
+    sh.net('VIN_RAW', ('J4', '1'))
+    sh.net('GND', ('J4', '2'))
+
+    u2 = sh.part('Regulator_Linear:L7805', 'U2', 'LM7805', 99.06, yr,
+                 footprint='Package_TO_SOT_THT:TO-220-3_Vertical')
+    sh.power('GND', *u2['2'], 'D')
+    sh.net('GND', ('U2', '2'))
+    caps_in = []
+    for ref, val, x, fp, pol in (('C1', '100uF/25V', 66.04, 'Capacitor_THT:CP_Radial_D8.0mm_P3.50mm', True),
+                                 ('C2', '0.33uF', 78.74, FP_C, False)):
+        c = sh.part('Device:C_Polarized' if pol else 'Device:C', ref, val, x, yr + 10.16, footprint=fp)
+        sh.cable((x, yr), c['1'])
+        sh.power('GND', *c['2'], 'D')
+        sh.net('VIN', (ref, '1'))
+        sh.net('GND', (ref, '2'))
+        caps_in.append((x, yr))
+    sh.cable(d1['1'], (58.42, yr), caps_in[0], caps_in[1], (83.82, yr), u2['1'])
+    sh.flag(58.42, yr, 'U')
+    sh.label('VIN', 83.82, yr, 'R')
+    sh.net('VIN', ('D1', '1'), ('U2', '1'))
+
+    rail = [u2['3']]
+    for ref, val, x, fp, pol in (('C3', '0.1uF', 114.3, FP_C, False),
+                                 ('C4', '100uF/16V', 124.46, 'Capacitor_THT:CP_Radial_D6.3mm_P2.50mm', True)):
+        c = sh.part('Device:C_Polarized' if pol else 'Device:C', ref, val, x, yr + 10.16, footprint=fp)
+        sh.cable((x, yr), c['1'])
+        sh.power('GND', *c['2'], 'D')
+        sh.net('+5V', (ref, '1'))
+        sh.net('GND', (ref, '2'))
+        rail.append((x, yr))
+    xl = 137.16
+    r1 = sh.part('Device:R', 'R1', '1k', xl, yr + 8.89, footprint=FP_R)
+    d2 = sh.part('Device:LED', 'D2', 'LED ON', xl, yr + 22.86, r=90, footprint='LED_THT:LED_D3.0mm',
+                 fields=VLED_L)
+    sh.cable(*rail, (xl, yr), (146.05, yr))
+    sh.cable((xl, yr), r1['1'])
+    sh.cable(r1['2'], d2['2'])
+    sh.power('+5V', 146.05, yr, 'U')
+    sh.power('GND', *d2['1'], 'D')
+    sh.net('+5V', ('U2', '3'), ('R1', '1'))
+    sh.net('LED_PWR', ('R1', '2'), ('D2', '2'))
+    sh.net('GND', ('D2', '1'))
+    sh.text('D1 en serie: si el jack se conecta al revés no circula corriente.\n'
+            'Entrada mínima ≈ 7,7 V (2 V del 7805 + 0,7 V del diodo).\n'
             'Con 12 V usar disipador en U2.\n'
             'C2, C3 y C4 junto al 7805: sin ellos el micro se congelaba\n'
-            'al multiplexar los displays (picos de ~100 mA).', 55.88, 73.66)
+            'al multiplexar los displays (picos de ≈ 100 mA).\n'
+            'J1 (jack) y J4 (bornera) van en paralelo: conectar solo una fuente.', 17.78, 80.01)
 
     # ---------------- Reloj -------------------------------------------------
     sh.box(157.48, 15.24, 213.36, 96.52, 'RELOJ 16 MHz')
-    sh.part('Device:Crystal', 'Y1', '16MHz', 185.42, 38.1, footprint='Crystal:Crystal_HC49-4H_Vertical',
-            conns={'1': 'XTAL1', '2': 'XTAL2'}, stub=5.08)
-    sh.part('Device:C', 'C8', '22pF', 172.72, 63.5, footprint=FP_C, conns={'1': 'XTAL1', '2': 'GND'})
-    sh.part('Device:C', 'C9', '22pF', 198.12, 63.5, footprint=FP_C, conns={'1': 'XTAL2', '2': 'GND'})
+    yx = 40.64
+    y1 = sh.part('Device:Crystal', 'Y1', '16MHz', 185.42, yx, footprint='Crystal:Crystal_HC49-4H_Vertical')
+    for ref, xc, pin, name, xe, d in (('C8', 175.26, '1', 'XTAL1', 165.1, 'L'),
+                                      ('C9', 195.58, '2', 'XTAL2', 205.74, 'R')):
+        c = sh.part('Device:C', ref, '22pF', xc, yx + 12.7, footprint=FP_C)
+        sh.cable(y1[pin], (xc, yx), (xe, yx))
+        sh.cable((xc, yx), c['1'])
+        sh.power('GND', *c['2'], 'D')
+        sh.label(name, xe, yx, d)
+        sh.net(name, ('Y1', pin), (ref, '1'))
+        sh.net('GND', (ref, '2'))
+    sh.text('Cristal y capacitores de 22 pF\nlo más cerca posible de los\npines 9 y 10 del micro.', 162.56, 73.66)
 
     # ---------------- Reset -------------------------------------------------
     sh.box(218.44, 15.24, 274.32, 96.52, 'RESET')
-    sh.part('Device:R', 'R2', '10k', 233.68, 43.18, footprint=FP_R, conns={'1': '+5V', '2': 'RESET'})
-    sh.part('Switch:SW_Push', 'SW1', 'Pulsador', 254.0, 60.96, r=90, footprint='Button_Switch_THT:SW_PUSH_6mm',
-            conns={'2': 'RESET', '1': 'GND'}, fields=VLED)
-    sh.text('Pull-up de 10k: RESET en alto.\nAl pulsar SW1 el pin 1 va a GND\ny el micro se reinicia.', 223.52, 76.2)
+    xr, yn = 238.76, 50.8
+    r2 = sh.part('Device:R', 'R2', '10k', xr, 38.1, footprint=FP_R)
+    sw1 = sh.part('Switch:SW_Push', 'SW1', 'Pulsador', 256.54, yn + 7.62, r=90,
+                  footprint='Button_Switch_THT:SW_PUSH_6mm', fields=VLED)
+    top, bot = sorted(('1', '2'), key=lambda k: sw1[k][1])
+    sh.power('+5V', *r2['1'], 'U')
+    sh.cable(r2['2'], (xr, yn))
+    sh.cable((226.06, yn), (xr, yn), (sw1[top][0], yn), sw1[top])
+    sh.power('GND', *sw1[bot], 'D')
+    sh.label('RESET', 226.06, yn, 'L')
+    sh.net('+5V', ('R2', '1'))
+    sh.net('RESET', ('R2', '2'), ('SW1', top))
+    sh.net('GND', ('SW1', bot))
+    # C11 filtra el ruido de la pista de RESET; D11 recorta el pico que deja C10 (DTR) por encima de 5 V
+    xc11 = 246.38
+    c11 = sh.part('Device:C', 'C11', '10nF', xc11, yn + 7.62, footprint=FP_C,
+                  fields={'Reference': (-2.54, -1.27, 'right'), 'Value': (-2.54, 1.27, 'right')})
+    sh.cable((xc11, yn), c11['1'])
+    sh.power('GND', *c11['2'], 'D')
+    xd = 231.14
+    d11 = sh.part('Diode:1N4148', 'D11', '1N4148', xd, yn - 7.62, r=270,
+                  footprint='Diode_THT:D_DO-35_SOD27_P7.62mm_Horizontal',
+                  fields={'Reference': (-2.54, -1.27, 'right'), 'Value': (-2.54, 1.27, 'right')})
+    k, a = d11['1'], d11['2']
+    assert k[1] < a[1], 'D11: el catodo debe quedar arriba (hacia +5V)'
+    sh.cable(a, (xd, yn))
+    sh.cable(k, (xd, k[1] - 2.54))
+    sh.power('+5V', xd, k[1] - 2.54, 'U')
+    sh.net('RESET', ('C11', '1'), ('D11', '2'))
+    sh.net('GND', ('C11', '2'))
+    sh.net('+5V', ('D11', '1'))
+    sh.text('Pull-up de 10 kΩ: RESET en alto.\nAl pulsar SW1 el pin 1 va a GND\ny el micro se reinicia.\n'
+            'C11 filtra el ruido de la pista;\nD11 recorta el pico de C10 (DTR).', 223.52, 73.66)
 
     # ---------------- Programacion -----------------------------------------
-    sh.box(279.4, 15.24, 406.4, 96.52, 'PROGRAMACION: ICSP con Arduino Uno (principal) y FTDI (opcional)')
-    sh.part('Connector_Generic:Conn_01x06', 'J2', 'FTDI', 307.34, 45.72, r=180,
-            footprint='Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical',
-            conns={'1': 'GND', '2': 'GND', '3': '+5V', '4': 'RXD', '5': 'TXD', '6': 'DTR'}, stub=5.08,
-            stubs={'2': 12.7})
-    sh.text('J2 (mismo orden que el modulo FTDI):\n'
-            '1 GND\n2 CTS (a GND)\n3 VCC 5V\n4 RXI  <- TX del FTDI\n5 TXO  -> RX del FTDI\n6 DTR  (auto-reset)',
+    sh.box(279.4, 15.24, 406.4, 96.52, 'PROGRAMACIÓN: ICSP con Arduino Uno (principal) y FTDI (opcional)')
+    j2 = sh.part('Connector_Generic:Conn_01x06', 'J2', 'FTDI', 307.34, 45.72, r=180,
+                 footprint='Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical',
+                 conns={'3': '+5V', '4': 'RXD', '5': 'TXD'}, stub=5.08)
+    # GND y CTS del modulo FTDI unidos
+    xg = j2['1'][0] + 7.62
+    sh.cable(j2['2'], (xg, j2['2'][1]), (xg, j2['1'][1]), (xg, j2['1'][1] + 2.54))
+    sh.cable(j2['1'], (xg, j2['1'][1]))
+    sh.power('GND', xg, j2['1'][1] + 2.54, 'D')
+    sh.net('GND', ('J2', '1'), ('J2', '2'))
+    # DTR -> C10 -> RESET (auto-reset al subir el programa)
+    yd = j2['6'][1]
+    c10 = sh.part('Device:C', 'C10', '0.1uF', 330.2, yd, r=90, footprint=FP_C, fields=HORIZ)
+    sh.cable(j2['6'], (316.23, yd), c10['1'])
+    sh.label('DTR', 316.23, yd, 'R')
+    sh.cable(c10['2'], (345.44, yd))
+    sh.label('RESET', 345.44, yd, 'R')
+    sh.net('DTR', ('J2', '6'), ('C10', '1'))
+    sh.net('RESET', ('C10', '2'))
+    sh.text('J2 (mismo orden que el módulo FTDI):\n'
+            '1 GND\n2 CTS (a GND)\n3 VCC 5 V\n4 RXI  ← TX del FTDI\n5 TXO  → RX del FTDI\n6 DTR  (auto-reset)',
             284.48, 58.42)
-    sh.part('Device:C', 'C10', '0.1uF', 340.36, 33.02, r=90, footprint=FP_C, conns={'1': 'DTR', '2': 'RESET'},
-            stub=5.08, fields=HORIZ)
-    sh.text('C10: el pulso de DTR reinicia el micro\nal subir el programa (auto-reset).', 325.12, 40.64)
+    sh.text('C10: el pulso de DTR reinicia el micro\nal subir el programa (auto-reset).', 327.66, 45.72)
     sh.part('Connector:AVR-ISP-6', 'J3', 'ICSP', 378.46, 60.96,
             footprint='Connector_PinHeader_2.54mm:PinHeader_2x03_P2.54mm_Vertical',
             conns={'1': 'SEL_UNI', '2': '+5V', '3': 'SCK', '4': 'SEL_DEC', '5': 'RESET', '6': 'GND'}, stub=5.08)
     sh.text('J3 con Arduino Uno + sketch ArduinoISP:\n'
-            'D10->RST  D11->MOSI(PB3)  D12->MISO(PB4)  D13->SCK(PB5)  GND->GND\n'
-            '10uF entre RESET y GND del Uno. No unir el 5V del Uno si hay 7805.', 325.12, 81.28)
+            'D10→RST  D11→MOSI (PB3)  D12→MISO (PB4)  D13→SCK (PB5)  GND→GND\n'
+            '10 µF entre RESET y GND del Uno. No unir el 5 V del Uno si hay 7805.', 322.58, 81.28)
 
     # ---------------- Microcontrolador --------------------------------------
     sh.box(12.7, 101.6, 132.08, 248.92, 'MICROCONTROLADOR')
@@ -353,7 +502,7 @@ def build():
     sh.part('Device:C', 'C6', '0.1uF', 33.02, 223.52, footprint=FP_C, conns={'1': '+5V', '2': 'GND'})
     sh.part('Device:C', 'C7', '0.1uF', 43.18, 223.52, footprint=FP_C, conns={'1': 'AREF', '2': 'GND'})
     sh.text('C5 junto a VCC (7), C6 junto a AVCC (20),\nC7 en AREF (21). Los dos GND (8 y 22) a tierra.\n'
-            'C5/C6 pegados al chip y cristal junto a pines 9-10:\nreducen el ruido del multiplexado.',
+            'C5/C6 pegados al chip y cristal junto a los pines 9–10:\nreducen el ruido del multiplexado.',
             17.78, 236.22)
     sh.text('Equivalencias Arduino:\nPD2..PD7 = D2..D7    PB0..PB5 = D8..D13\n'
             'PC0..PC4 = A0..A4    PD0/PD1 = RX/TX (FTDI)', 17.78, 106.68)
@@ -369,35 +518,35 @@ def build():
     for i in range(8):
         x = 190.5 + i * 7.62
         pos = sh.part('Device:LED', 'D%d' % (3 + i), 'LED%d' % i, x, 125.73, r=90, footprint=FP_LED5,
-                      conns={'2': 'SEG_' + SEG[i]}, stub=5.08,
+                      conns={'2': 'SEG_' + SEG[int(LED_PERM[i])]}, stub=5.08,
                       fields=VLED, hide_value=True)
         kx.append(pos['1'])
+        sh.net('K_LEDS', ('D%d' % (3 + i), '1'))
     yb = kx[0][1] + 7.62
     for (x, y) in kx:
         sh.wire(x, y, x, yb)
     for i in range(7):
         sh.wire(kx[i][0], yb, kx[i + 1][0], yb)
-    for (x, y) in kx[1:-1]:
-        sh.junction(x, yb)
     sh.wire(kx[-1][0], yb, kx[-1][0] + 7.62, yb)
-    sh.junction(kx[-1][0], yb)
     sh.label('K_LEDS', kx[-1][0] + 7.62, yb, 'R')
-    sh.text('LED0..LED7 = bits 0..7 del bus', 187.96, 149.86)
+    sh.text('SEG_A..SEG_DP = líneas del bus que salen de R3..R10 (bit 0..7).\n'
+            'Cada segmento y cada LED va a la línea elegida para rutear la PCB de una cara\n'
+            'con menos puentes; el firmware lo compensa (tablas BIT_SEG y BIT_LED).', 187.96, 149.86)
 
     for ref, name, x, k in (('U3', 'DECENAS', 294.64, 'K_DEC'), ('U4', 'UNIDADES', 355.6, 'K_UNI')):
         pos = sh.part('Display_Character:KCSC02-105', ref, '5161AS ' + name, x, 124.46,
-                      footprint='Display_7Segment:KCSC02-105',
-                      conns={'7': 'SEG_A', '6': 'SEG_B', '4': 'SEG_C', '2': 'SEG_D', '1': 'SEG_E',
-                             '9': 'SEG_F', '10': 'SEG_G', '5': 'SEG_DP', '3': None, '8': None}, stub=5.08,
+                      footprint='entrenador:Display_5161AS',
+                      conns=dict({DISP_PIN[sg]: 'SEG_' + SEG[int(SEG_PERM[s])] for s, sg in enumerate(SEG)},
+                                 **{'3': None, '8': None}), stub=5.08,
                       fields={'Reference': (0, -17.78, None), 'Value': (0, -15.24, None)})
         (x3, y3), (x8, y8) = pos['3'], pos['8']
         sh.wire(x3, y3, x8, y8)
         sh.wire(x8, y8, x8 + 5.08, y8)
         sh.label(k, x8 + 5.08, y8, 'R')
         sh.nets[(ref, '3')] = sh.nets[(ref, '8')] = k
-    sh.text('Displays de catodo comun (pines 3 y 8 = CC).\nPinout 5161AS = KCSC02-105.', 287.02, 142.24)
+    sh.text('Displays de cátodo común (pines 3 y 8 = CC).\nPinout 5161AS = KCSC02-105.', 287.02, 142.24)
 
-    # transistores de seleccion
+    # transistores de selección
     for i, (sel, k, x) in enumerate((('SEL_LED', 'K_LEDS', 218.44), ('SEL_DEC', 'K_DEC', 284.48),
                                      ('SEL_UNI', 'K_UNI', 350.52))):
         rpos = sh.part('Device:R', 'R%d' % (11 + i), '1k', x - 15.24, 180.34, r=90, footprint=FP_R,
@@ -413,25 +562,42 @@ def build():
     # ---------------- Entradas ----------------------------------------------
     sh.box(137.16, 210.82, 287.02, 278.13, 'ENTRADAS')
     sh.part('Device:R_Potentiometer', 'RV1', '10k', 157.48, 241.3,
-            footprint='Potentiometer_THT:Potentiometer_Piher_PT-10-V10_Vertical',
+            footprint='entrenador:Pot_3pin_P5.00mm',
             conns={'1': '+5V', '3': 'GND', '2': 'POT'}, stub=5.08)
-    sh.text('Potenciometro -> ADC0 (A0)', 142.24, 261.62)
+    sh.text('Potenciómetro → ADC0 (A0)', 142.24, 261.62)
     dip = sh.part('Switch:SW_DIP_x04', 'SW2', 'DIP x4', 218.44, 241.3,
                   footprint='Button_Switch_THT:SW_DIP_SPSTx04_Slide_9.78x12.34mm_W7.62mm_P2.54mm',
-                  conns={'1': 'DIP1', '2': 'DIP2', '3': 'DIP3', '4': 'DIP4',
-                         '5': None, '6': None, '7': None, '8': None}, stub=5.08)
-    col = sorted((dip[p] for p in '5678'), key=lambda t: t[1])
+                  conns={'8': 'DIP1', '7': 'DIP2', '6': 'DIP3', '5': 'DIP4',
+                         '1': None, '2': None, '3': None, '4': None}, stub=5.08)
+    col = sorted((dip[p] for p in '1234'), key=lambda t: t[1])
     for a, b in zip(col, col[1:]):
         sh.wire(a[0], a[1], b[0], b[1])
-    for p in col[1:-1]:
-        sh.junction(*p)
-    sh.wire(col[-1][0], col[-1][1], col[-1][0] + 5.08, col[-1][1])
-    sh.junction(*col[-1])
-    sh.power('GND', col[-1][0] + 5.08, col[-1][1], 'R')
-    for p in '5678':
+    sh.wire(col[-1][0], col[-1][1], col[-1][0] - 5.08, col[-1][1])
+    sh.power('GND', col[-1][0] - 5.08, col[-1][1], 'L')
+    for p in '1234':
         sh.nets[('SW2', p)] = 'GND'
-    sh.text('Pull-up interna (INPUT_PULLUP):\ninterruptor cerrado = 0, abierto = 1.\nDIP1..DIP4 -> PC1..PC4 (A1..A4)',
+    sh.text('Pull-up interna (INPUT_PULLUP):\ninterruptor cerrado = 0, abierto = 1.\nDIP1..DIP4 → PC1..PC4 (A1..A4)',
             200.66, 256.54)
+
+    # ---------------- Puntos de prueba ---------------------------------------
+    sh.box(292.1, 210.82, 406.4, 245.11, 'PUNTOS DE PRUEBA (lazos de alambre para la punta del multímetro)')
+    for i, (net, label) in enumerate((('GND', 'GND'), ('GND', 'GND'), ('VIN', 'VIN'), ('+5V', '+5V'),
+                                      ('POT', 'POT'), ('RESET', 'RESET'))):
+        sh.part('Connector:TestPoint', 'TP%d' % (i + 1), label, 302.26 + i * 15.24, 226.06,
+                footprint='TestPoint:TestPoint_Loop_D2.50mm_Drill1.0mm', conns={'1': net}, stub=5.08)
+    sh.text('VIN ≈ entrada − 0,7 V; +5V entre 4,8 y 5,2 V; POT de 0 a 5 V al girar; RESET en 5 V (0 V al pulsar).',
+            297.18, 240.03)
+
+    # ---------------- Notas -------------------------------------------------
+    sh.text('NOTAS\n'
+            '1. Alimentación de 9 a 12 V CC por J1 (jack) o J4 (bornera). D1 bloquea la polaridad invertida.\n'
+            '2. Se programa por J3 con un Arduino Uno como ISP. Fusibles: L 0xF7, H 0xDE, E 0xFC\n'
+            '    (cristal de 16 MHz con oscilador de excursión completa; brown-out en 4,3 V). J2 (FTDI) es opcional.\n'
+            '3. Bus de 8 bits compartido: Q1, Q2 y Q3 encienden un solo grupo a la vez (multiplexado).\n'
+            '4. Entradas: potenciómetro en ADC0; DIP en PC1–PC4 con pull-up interna (cerrado = 0).\n'
+            '5. PCB de una cara: el DIP lleva las señales en los pines 8–5 y GND en 1–4 para no cruzar\n'
+            '    pistas. Puentes de alambre en kicad/fabricacion/PUENTES.md.',
+            17.78, 252.73, size=1.4)
 
     sh.save(OUT)
     return sh
