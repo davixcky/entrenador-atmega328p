@@ -46,7 +46,9 @@
 - Las notas numeradas de la hoja resumen alimentación, programación (fusibles), multiplexado, entradas y el cableado del DIP para la PCB.
 - Para montar en protoboard se usa [`kicad/CONEXIONES.md`](kicad/CONEXIONES.md): una tabla por red con cada pin que hay que unir.
 
-Para regenerar el esquemático y sus verificaciones:
+Para regenerar el esquemático y sus verificaciones (con KiCad 10 y sus librerías; con otra versión
+cambian los símbolos y se rompen conexiones. Si los símbolos no están en `/usr/share/kicad/symbols`,
+definir `KICAD10_SYMBOL_DIR`):
 
 ```bash
 cd kicad
@@ -79,6 +81,7 @@ Se dejan libres `PD0/PD1` (RX/TX) para poder usar un FTDI, y `PB6/PB7` y `PC6` q
 | SCK del ICSP (sin otro uso; pull-up en el firmware) | PB5 | 19 | D13 |
 | Potenciómetro | PC0 / ADC0 | 23 | A0 |
 | DIP SW1..SW4 | PC1..PC4 | 24..27 | A1..A4 |
+| Botones B1..B5 (escalera, analógica) | PC5 / ADC5 | 28 | A5 |
 | RX / TX (FTDI) | PD0 / PD1 | 2 / 3 | D0 / D1 |
 | Cristal 16 MHz | PB6 / PB7 | 9 / 10 | — |
 | RESET | PC6 | 1 | — |
@@ -132,14 +135,14 @@ Se dejan libres `PD0/PD1` (RX/TX) para poder usar un FTDI, y `PB6/PB7` y `PC6` q
 |------:|-----------|
 | 2 | ATmega328P-PU (DIP-28) (uno de repuesto) + 2 zócalos DIP-28 |
 | 1 | Cristal 16 MHz + 2 capacitores cerámicos 22 pF |
-| 2 | Pulsadores 6x6 mm (RESET) |
+| 2 + 5 | Pulsadores 6x6 mm (RESET + botones B1..B5) |
 | 1 | Potenciómetro 10 kΩ lineal |
 | 1 | DIP switch de 4 posiciones |
 | 8 | LED 5 mm |
 | 2 | Display 7 segmentos cátodo común 0.56" (5161AS) |
 | 3 | Transistor NPN 2N2222 (**comprobar el orden E-B-C con el multímetro antes de soldar**: algunos vienen C-B-E) |
-| 8 / 4 / 2 | Resistencias 220 Ω / 1 kΩ / 10 kΩ |
-| 6 / 1 | Capacitores cerámicos 0.1 µF (104) / 10 nF (103, filtro de RESET) |
+| 8 / 4 / 3 / 5 | Resistencias 220 Ω / 1 kΩ / 10 kΩ / 2.2 kΩ (escalera de botones) |
+| 7 / 1 | Capacitores cerámicos 0.1 µF (104) / 10 nF (103, filtro de RESET) |
 | 1 | Capacitor cerámico 0.33 µF (334) |
 | 1 / 1 | Electrolíticos 100 µF/25 V (entrada) y 100 µF/16 V (salida) |
 | 1 / 2 / 1 | LM7805 (TO-220) / diodos 1N4007 / diodo 1N4148 (RESET) |
@@ -373,6 +376,8 @@ python3 tools/lista_puentes.py
 3. Simulación en SimulIDE con capturas.
 4. Fabricar la PCB (tóner o CNC), montarla y probarla con `firmware/entrenador`.
 5. Informe final paso a paso y exposición.
+6. Botones B1..B5 en escalera (PC5): soldarlos, medir la lectura de cada uno y agregar `boton(n)` a la
+   biblioteca y al lenguaje. La PCB de `kicad/` todavía no los incluye.
 
 ## Estructura de la carpeta
 
