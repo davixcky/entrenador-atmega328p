@@ -1,0 +1,14 @@
+{
+  "name": "entrenador-atmega328p-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "recursos": "node scripts/copiar-recursos.mjs",
+    "dev": "npm run recursos && astro dev",
+    "build": "npm run recursos && astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "^6.4.8"
+  }
+}

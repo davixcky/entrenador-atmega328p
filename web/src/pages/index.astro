@@ -1,0 +1,20 @@
+---
+// Raiz: elige el idioma del navegador (español por defecto).
+import { base } from '../i18n'
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Entrenador ATmega328P</title>
+    <meta http-equiv="refresh" content={`0; url=${base}/es/`} />
+    <link rel="canonical" href={`${base}/es/`} />
+    <script is:inline define:vars={{ base }}>
+      location.replace(base + (navigator.language?.toLowerCase().startsWith('es') ? '/es/' : '/en/'))
+    </script>
+  </head>
+  <body>
+    <p><a href={`${base}/es/`}>Español</a> · <a href={`${base}/en/`}>English</a></p>
+  </body>
+</html>
