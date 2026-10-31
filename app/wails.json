@@ -1,0 +1,13 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "entrenador-bloques",
+  "outputfilename": "entrenador-bloques",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "David Orozco",
+    "email": "orozco.davidj02@gmail.com"
+  }
+}

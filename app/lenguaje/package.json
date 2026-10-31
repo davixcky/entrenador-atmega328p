@@ -1,0 +1,12 @@
+{
+  "name": "@entrenador/lenguaje",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Lenguaje del entrenador ATmega328P: texto, diagrama de nodos y compilador a bytecode",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "test": "node --test --no-warnings pruebas/*.test.ts",
+    "ejemplos": "node --no-warnings herramientas/hex-ejemplos.ts"
+  }
+}

@@ -1,0 +1,68 @@
+/*
+ * Demo de salidas sin entradas (sin DIP switch ni potenciometro).
+ * Usa el mismo mapeo que entrenador.ino con PCB 2 (cableado real de la placa).
+ *
+ * Repite:
+ *   1) Contador 00..99 cada 250 ms, LEDs = cuenta en binario.
+ *   2) Tres vueltas de "auto fantastico" en los LEDs, displays = posicion 1..8.
+ */
+
+#include <avr/interrupt.h>
+
+const uint8_t BIT_SEG[8] = {6, 4, 0, 7, 2, 5, 3, 1};  // bit del bus de cada segmento a..dp
+const uint8_t BIT_LED[8] = {0, 1, 2, 3, 4, 5, 6, 7};  // LED0 abajo .. LED7 arriba
+
+const uint8_t DIGITO[10] = {
+  0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F
+};
+
+volatile uint8_t pantalla[3];  // 0 = LEDs, 1 = decenas, 2 = unidades
+
+static uint8_t reordenar(uint8_t valor, const uint8_t *tabla) {
+  uint8_t bus = 0;
+  for (uint8_t i = 0; i < 8; i++)
+    if (valor & (1 << i)) bus |= (uint8_t)(1 << tabla[i]);
+  return bus;
+}
+
+static void escribirBus(uint8_t valor) {
+  PORTD = (PORTD & 0x03) | (uint8_t)(valor << 2);
+  PORTB = (PORTB & 0xFC) | (valor >> 6);
+}
+
+ISR(TIMER2_COMPA_vect) {
+  static uint8_t grupo = 0;
+  PORTB &= ~0x1C;
+  grupo = (grupo + 1) % 3;
+  escribirBus(pantalla[grupo]);
+  PORTB |= (uint8_t)(1 << (PB2 + grupo));
+}
+
+static void mostrar(uint8_t leds, uint8_t n) {
+  pantalla[0] = reordenar(leds, BIT_LED);
+  pantalla[1] = reordenar(DIGITO[(n / 10) % 10], BIT_SEG);
+  pantalla[2] = reordenar(DIGITO[n % 10], BIT_SEG);
+}
+
+void setup() {
+  DDRD |= 0xFC;
+  DDRB |= 0x1F;
+  cli();
+  TCCR2A = (1 << WGM21);
+  TCCR2B = (1 << CS22) | (1 << CS21);
+  OCR2A = 124;                 // 2 ms por grupo
+  TIMSK2 = (1 << OCIE2A);
+  sei();
+}
+
+void loop() {
+  for (uint8_t n = 0; n < 100; n++) {
+    mostrar(n, n);
+    delay(250);
+  }
+
+  for (uint8_t vuelta = 0; vuelta < 3; vuelta++) {
+    for (uint8_t p = 0; p < 8; p++) { mostrar((uint8_t)(1 << p), p + 1); delay(100); }
+    for (uint8_t p = 6; p > 0; p--) { mostrar((uint8_t)(1 << p), p + 1); delay(100); }
+  }
+}

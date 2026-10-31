@@ -1,0 +1,7 @@
+# La raiz ignora build/; aqui build/ tiene los recursos de Wails y solo bin/ es salida
+!/build/
+/build/bin/
+frontend/node_modules/
+frontend/dist/
+frontend/package.json.md5
+/entrenador-bloques

@@ -28,9 +28,13 @@
 // PCB 1: placa de una cara (kicad/). Para rutearla con menos puentes, cada segmento y cada
 // LED va a otra linea del bus (ver SEG_PERM / LED_PERM en kicad/tools/generar_esquematico.py).
 // PCB 0: protoboard, bit i del bus = segmento i = LEDi.
-#define PCB 1
+// PCB 2: placa armada con el cableado real, medido con firmware/prueba-mapeo.
+#define PCB 2
 
-#if PCB
+#if PCB == 2
+const uint8_t BIT_SEG[8] = {6, 4, 0, 7, 2, 5, 3, 1};  // bit del bus de cada segmento a..dp
+const uint8_t BIT_LED[8] = {0, 1, 2, 3, 4, 5, 6, 7};  // LED0 abajo .. LED7 arriba
+#elif PCB == 1
 const uint8_t BIT_SEG[8] = {1, 2, 0, 3, 4, 5, 6, 7};  // bit del bus de cada segmento a..dp
 const uint8_t BIT_LED[8] = {4, 3, 7, 1, 6, 5, 0, 2};  // bit del bus de cada LED0..LED7
 #else
