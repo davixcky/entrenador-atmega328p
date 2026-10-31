@@ -17,6 +17,7 @@ En la protoboard, marcar cada conexion a medida que se hace.
 | [ ] | J3 | ICSP | 2 | VCC |
 | [ ] | R1 | 1k | 1 |  |
 | [ ] | R2 | 10k | 1 |  |
+| [ ] | R14 | 2.2k | 1 |  |
 | [ ] | RV1 | 10k | 1 | 1 |
 | [ ] | TP4 | +5V | 1 | 1 |
 | [ ] | U1 | ATmega328P-PU | 7 | VCC |
@@ -37,6 +38,7 @@ En la protoboard, marcar cada conexion a medida que se hace.
 | [ ] | C8 | 22pF | 2 |  |
 | [ ] | C9 | 22pF | 2 |  |
 | [ ] | C11 | 10nF | 2 |  |
+| [ ] | C12 | 0.1uF | 2 |  |
 | [ ] | D2 | LED ON | 1 | K |
 | [ ] | J1 | 9-12 V DC | 2 |  |
 | [ ] | J2 | FTDI | 1 | GND |
@@ -46,6 +48,7 @@ En la protoboard, marcar cada conexion a medida que se hace.
 | [ ] | Q1 | 2N2222 | 1 | E |
 | [ ] | Q2 | 2N2222 | 1 | E |
 | [ ] | Q3 | 2N2222 | 1 | E |
+| [ ] | R19 | 10k | 2 |  |
 | [ ] | RV1 | 10k | 3 | 3 |
 | [ ] | SW1 | Pulsador | 1 | 1 |
 | [ ] | SW2 | DIP x4 | 1 |  |
@@ -243,7 +246,7 @@ En la protoboard, marcar cada conexion a medida que se hace.
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | D9 | LED6 | 2 | A |
+| [ ] | D3 | LED0 | 2 | A |
 | [ ] | R3 | 220 | 2 |  |
 | [ ] | U3 | 5161AS DECENAS | 4 | C |
 | [ ] | U4 | 5161AS UNIDADES | 4 | C |
@@ -252,37 +255,37 @@ En la protoboard, marcar cada conexion a medida que se hace.
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | D6 | LED3 | 2 | A |
+| [ ] | D4 | LED1 | 2 | A |
 | [ ] | R4 | 220 | 2 |  |
-| [ ] | U3 | 5161AS DECENAS | 7 | A |
-| [ ] | U4 | 5161AS UNIDADES | 7 | A |
+| [ ] | U3 | 5161AS DECENAS | 5 | DP |
+| [ ] | U4 | 5161AS UNIDADES | 5 | DP |
 
 ## SEG_C
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | D10 | LED7 | 2 | A |
+| [ ] | D5 | LED2 | 2 | A |
 | [ ] | R5 | 220 | 2 |  |
-| [ ] | U3 | 5161AS DECENAS | 6 | B |
-| [ ] | U4 | 5161AS UNIDADES | 6 | B |
+| [ ] | U3 | 5161AS DECENAS | 1 | E |
+| [ ] | U4 | 5161AS UNIDADES | 1 | E |
 
 ## SEG_D
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | D4 | LED1 | 2 | A |
+| [ ] | D6 | LED3 | 2 | A |
 | [ ] | R6 | 220 | 2 |  |
-| [ ] | U3 | 5161AS DECENAS | 2 | D |
-| [ ] | U4 | 5161AS UNIDADES | 2 | D |
+| [ ] | U3 | 5161AS DECENAS | 10 | G |
+| [ ] | U4 | 5161AS UNIDADES | 10 | G |
 
 ## SEG_E
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | D3 | LED0 | 2 | A |
+| [ ] | D7 | LED4 | 2 | A |
 | [ ] | R7 | 220 | 2 |  |
-| [ ] | U3 | 5161AS DECENAS | 1 | E |
-| [ ] | U4 | 5161AS UNIDADES | 1 | E |
+| [ ] | U3 | 5161AS DECENAS | 6 | B |
+| [ ] | U4 | 5161AS UNIDADES | 6 | B |
 
 ## SEG_F
 
@@ -297,19 +300,19 @@ En la protoboard, marcar cada conexion a medida que se hace.
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | D7 | LED4 | 2 | A |
+| [ ] | D9 | LED6 | 2 | A |
 | [ ] | R9 | 220 | 2 |  |
-| [ ] | U3 | 5161AS DECENAS | 10 | G |
-| [ ] | U4 | 5161AS UNIDADES | 10 | G |
+| [ ] | U3 | 5161AS DECENAS | 7 | A |
+| [ ] | U4 | 5161AS UNIDADES | 7 | A |
 
 ## SEG_DP
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | D5 | LED2 | 2 | A |
+| [ ] | D10 | LED7 | 2 | A |
 | [ ] | R10 | 220 | 2 |  |
-| [ ] | U3 | 5161AS DECENAS | 5 | DP |
-| [ ] | U4 | 5161AS UNIDADES | 5 | DP |
+| [ ] | U3 | 5161AS DECENAS | 2 | D |
+| [ ] | U4 | 5161AS UNIDADES | 2 | D |
 
 ## SEL_LED
 
@@ -384,3 +387,55 @@ En la protoboard, marcar cada conexion a medida que se hace.
 | [ ] | Q3 | 2N2222 | 3 | C |
 | [ ] | U4 | 5161AS UNIDADES | 3 | CC |
 | [ ] | U4 | 5161AS UNIDADES | 8 | CC |
+
+## BOTONES
+
+| Hecho | Componente | Valor | Pin | Funcion del pin |
+|:-:|---|---|---:|---|
+| [ ] | C12 | 0.1uF | 1 |  |
+| [ ] | R19 | 10k | 1 |  |
+| [ ] | SW3 | B1 | 1 | 1 |
+| [ ] | SW4 | B2 | 1 | 1 |
+| [ ] | SW5 | B3 | 1 | 1 |
+| [ ] | SW6 | B4 | 1 | 1 |
+| [ ] | SW7 | B5 | 1 | 1 |
+| [ ] | U1 | ATmega328P-PU | 28 | PC5 |
+
+## Net-(R14-Pad2)
+
+| Hecho | Componente | Valor | Pin | Funcion del pin |
+|:-:|---|---|---:|---|
+| [ ] | R14 | 2.2k | 2 |  |
+| [ ] | R15 | 2.2k | 1 |  |
+| [ ] | SW3 | B1 | 2 | 2 |
+
+## Net-(R15-Pad2)
+
+| Hecho | Componente | Valor | Pin | Funcion del pin |
+|:-:|---|---|---:|---|
+| [ ] | R15 | 2.2k | 2 |  |
+| [ ] | R16 | 2.2k | 1 |  |
+| [ ] | SW4 | B2 | 2 | 2 |
+
+## Net-(R16-Pad2)
+
+| Hecho | Componente | Valor | Pin | Funcion del pin |
+|:-:|---|---|---:|---|
+| [ ] | R16 | 2.2k | 2 |  |
+| [ ] | R17 | 2.2k | 1 |  |
+| [ ] | SW5 | B3 | 2 | 2 |
+
+## Net-(R17-Pad2)
+
+| Hecho | Componente | Valor | Pin | Funcion del pin |
+|:-:|---|---|---:|---|
+| [ ] | R17 | 2.2k | 2 |  |
+| [ ] | R18 | 2.2k | 1 |  |
+| [ ] | SW6 | B4 | 2 | 2 |
+
+## Net-(R18-Pad2)
+
+| Hecho | Componente | Valor | Pin | Funcion del pin |
+|:-:|---|---|---:|---|
+| [ ] | R18 | 2.2k | 2 |  |
+| [ ] | SW7 | B5 | 2 | 2 |
