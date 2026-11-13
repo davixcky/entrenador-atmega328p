@@ -49,6 +49,8 @@ const COLORES: Record<string, string> = {
   inicio: '#3ecf8e',
   control: '#e0a33a',
   salidas: '#ef5b4c',
+  lcd: '#4c9aff',
+  nube: '#2bb6a8',
   datos: '#a371f7',
   notas: '#768390',
 }
@@ -148,7 +150,9 @@ const tiposNodo = { instruccion: NodoInstruccion }
 // ---- Paleta ----
 
 const CATEGORIAS: { nombre: string; categoria: string; tipos: TipoNodo[] }[] = [
-  { nombre: 'Salidas', categoria: 'salidas', tipos: ['mostrar', 'leds', 'led', 'apagar_displays'] },
+  { nombre: 'Salidas', categoria: 'salidas', tipos: ['mostrar', 'leds', 'led', 'apagar_displays', 'brillo'] },
+  { nombre: 'LCD', categoria: 'lcd', tipos: ['lcd_limpiar', 'lcd_texto', 'lcd_numero', 'lcd_luz', 'lcd_cursor'] },
+  { nombre: 'Nube (ESP32)', categoria: 'nube', tipos: ['nube_enviar', 'lcd_nube'] },
   { nombre: 'Control', categoria: 'control', tipos: ['esperar', 'si', 'repetir', 'mientras', 'siempre', 'romper', 'continuar', 'detener'] },
   { nombre: 'Datos', categoria: 'datos', tipos: ['asignar', 'llamada'] },
   { nombre: 'Notas', categoria: 'notas', tipos: ['comentario'] },

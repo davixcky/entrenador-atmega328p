@@ -14,6 +14,10 @@ export function CargarPrograma(arg1, arg2) {
   return window['go']['main']['App']['CargarPrograma'](arg1, arg2);
 }
 
+export function ComandoPuente(arg1, arg2) {
+  return window['go']['main']['App']['ComandoPuente'](arg1, arg2);
+}
+
 export function Conectar(arg1) {
   return window['go']['main']['App']['Conectar'](arg1);
 }
@@ -48,6 +52,10 @@ export function InstalarBiblioteca() {
 
 export function ListarPuertos() {
   return window['go']['main']['App']['ListarPuertos']();
+}
+
+export function PausarTelemetria(arg1) {
+  return window['go']['main']['App']['PausarTelemetria'](arg1);
 }
 
 export function PonerLeds(arg1) {

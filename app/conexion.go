@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
@@ -19,14 +20,24 @@ const bytesPorLinea = 32
 
 var errSinRespuesta = errors.New("sin respuesta")
 
-// Telemetria es la respuesta al comando T del entrenador.
+// Telemetria es la respuesta al comando T del entrenador (y la pantalla, del comando P).
 type Telemetria struct {
-	Pot       int  `json:"pot"`
-	Dip       int  `json:"dip"`
-	Leds      int  `json:"leds"`
-	Numero    *int `json:"numero"` // nil = displays apagados
-	Corriendo bool `json:"corriendo"`
-	Error     int  `json:"error"`
+	Pot       int       `json:"pot"`
+	Dip       int       `json:"dip"`
+	Leds      int       `json:"leds"`
+	Numero    *int      `json:"numero"` // nil = displays apagados
+	Corriendo bool      `json:"corriendo"`
+	Error     int       `json:"error"`
+	Pantalla  *Pantalla `json:"pantalla"` // nil con el firmware bloques 1
+}
+
+// Pantalla es la respuesta al comando P (firmware bloques 2): LCD y brillo de los LEDs.
+type Pantalla struct {
+	Lcd    int       `json:"lcd"` // 0 sin usar, 1 conectado, 2 sin respuesta por I2C
+	Brillo int       `json:"brillo"`
+	Lineas [2]string `json:"lineas"`
+	Luz    int       `json:"luz"`    // luz de fondo del LCD: 1 encendida
+	Cursor int       `json:"cursor"` // 0 sin cursor, 1 raya, 2 parpadeo
 }
 
 // conexion habla con el entrenador a traves del Uno en modo puente.
@@ -193,6 +204,38 @@ func parsearTelemetria(l string) (Telemetria, error) {
 		t.Numero = &n
 	}
 	return t, nil
+}
+
+func (c *conexion) pantalla() (*Pantalla, error) {
+	l, err := c.transaccion("P", 500*time.Millisecond)
+	if err != nil {
+		return nil, err
+	}
+	return parsearPantalla(l)
+}
+
+// "OK <lcd> <brillo> <64 digitos hex> [<luz> <cursor>]" (luz y cursor desde bloques 2.1)
+func parsearPantalla(l string) (*Pantalla, error) {
+	campos := strings.Fields(l)
+	if (len(campos) != 4 && len(campos) != 6) || campos[0] != "OK" || len(campos[3]) != 64 {
+		return nil, fmt.Errorf("pantalla invalida %q", l)
+	}
+	lcd, err1 := strconv.Atoi(campos[1])
+	brillo, err2 := strconv.Atoi(campos[2])
+	texto, err3 := hex.DecodeString(campos[3])
+	if err1 != nil || err2 != nil || err3 != nil {
+		return nil, fmt.Errorf("pantalla invalida %q", l)
+	}
+	p := &Pantalla{Lcd: lcd, Brillo: brillo, Lineas: [2]string{string(texto[:16]), string(texto[16:])}, Luz: 1}
+	if len(campos) == 6 {
+		luz, err4 := strconv.Atoi(campos[4])
+		cursor, err5 := strconv.Atoi(campos[5])
+		if err4 != nil || err5 != nil {
+			return nil, fmt.Errorf("pantalla invalida %q", l)
+		}
+		p.Luz, p.Cursor = luz, cursor
+	}
+	return p, nil
 }
 
 func (c *conexion) cargarPrograma(programa []byte) error {

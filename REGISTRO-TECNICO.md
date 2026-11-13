@@ -41,7 +41,7 @@
 - Proyecto KiCad 10: [`kicad/entrenador-atmega328p.kicad_pro`](kicad/entrenador-atmega328p.kicad_pro).
 - El esquemático se genera con [`kicad/tools/generar_esquematico.py`](kicad/tools/generar_esquematico.py) y se verifica con:
   - `kicad-cli sch erc` → **0 errores, 0 advertencias** ([`kicad/erc.rpt`](kicad/erc.rpt)).
-  - [`kicad/tools/verificar_netlist.py`](kicad/tools/verificar_netlist.py) → compara el netlist exportado por KiCad con las conexiones esperadas: **155 pines, 43 redes, 0 errores**.
+  - [`kicad/tools/verificar_netlist.py`](kicad/tools/verificar_netlist.py) → compara el netlist exportado por KiCad con las conexiones esperadas: **195 pines, 49 redes, 0 errores**.
 - Dentro de cada bloque (fuente, reloj, reset, programación) los componentes van unidos con cables en el orden en que pasa la señal; por ejemplo, la fuente se lee de izquierda a derecha: J1 → D1 → C1/C2 → 7805 → C3/C4 → LED de encendido. Entre bloques se usan etiquetas: las que tienen el mismo nombre (por ejemplo `SEG_A`, `BUS3`, `RESET`) están unidas. Los puntos de unión se calculan solos al generar el archivo.
 - Las notas numeradas de la hoja resumen alimentación, programación (fusibles), multiplexado, entradas y el cableado del DIP para la PCB.
 - Para montar en protoboard se usa [`kicad/CONEXIONES.md`](kicad/CONEXIONES.md): una tabla por red con cada pin que hay que unir.
@@ -55,7 +55,8 @@ cd kicad
 python3 tools/generar_esquematico.py
 kicad-cli sch erc -o erc.rpt entrenador-atmega328p.kicad_sch
 kicad-cli sch export netlist --format kicadsexpr -o out/net.net entrenador-atmega328p.kicad_sch
-(cd tools && python3 verificar_netlist.py ../out/net.net)
+kicad-cli sch export netlist --format kicadxml -o out/net.xml entrenador-atmega328p.kicad_sch
+(cd tools && python3 verificar_netlist.py ../out/net.xml)
 kicad-cli sch export pdf -o esquematico.pdf entrenador-atmega328p.kicad_sch
 pdftoppm -png -r 150 -singlefile esquematico.pdf esquematico
 python3 tools/lista_conexiones.py out/net.net CONEXIONES.md
@@ -81,7 +82,7 @@ Se dejan libres `PD0/PD1` (RX/TX) para poder usar un FTDI, y `PB6/PB7` y `PC6` q
 | SCK del ICSP (sin otro uso; pull-up en el firmware) | PB5 | 19 | D13 |
 | Potenciómetro | PC0 / ADC0 | 23 | A0 |
 | DIP SW1..SW4 | PC1..PC4 | 24..27 | A1..A4 |
-| Botones B1..B5 (escalera, analógica) | PC5 / ADC5 | 28 | A5 |
+| LCD I2C: SCL (actividad 15.3; SDA comparte PC4 con DIP4) | PC5 | 28 | A5 |
 | RX / TX (FTDI) | PD0 / PD1 | 2 / 3 | D0 / D1 |
 | Cristal 16 MHz | PB6 / PB7 | 9 / 10 | — |
 | RESET | PC6 | 1 | — |
@@ -135,13 +136,13 @@ Se dejan libres `PD0/PD1` (RX/TX) para poder usar un FTDI, y `PB6/PB7` y `PC6` q
 |------:|-----------|
 | 2 | ATmega328P-PU (DIP-28) (uno de repuesto) + 2 zócalos DIP-28 |
 | 1 | Cristal 16 MHz + 2 capacitores cerámicos 22 pF |
-| 2 + 5 | Pulsadores 6x6 mm (RESET + botones B1..B5) |
+| 2 | Pulsador 6x6 mm (RESET) |
 | 1 | Potenciómetro 10 kΩ lineal |
 | 1 | DIP switch de 4 posiciones |
 | 8 | LED 5 mm |
 | 2 | Display 7 segmentos cátodo común 0.56" (5161AS) |
 | 3 | Transistor NPN 2N2222 (**comprobar el orden E-B-C con el multímetro antes de soldar**: algunos vienen C-B-E) |
-| 8 / 4 / 3 / 5 | Resistencias 220 Ω / 1 kΩ / 10 kΩ / 2.2 kΩ (escalera de botones) |
+| 8 / 4 / 3 | Resistencias 220 Ω / 1 kΩ / 10 kΩ |
 | 7 / 1 | Capacitores cerámicos 0.1 µF (104) / 10 nF (103, filtro de RESET) |
 | 1 | Capacitor cerámico 0.33 µF (334) |
 | 1 / 1 | Electrolíticos 100 µF/25 V (entrada) y 100 µF/16 V (salida) |
@@ -376,8 +377,8 @@ python3 tools/lista_puentes.py
 3. Simulación en SimulIDE con capturas.
 4. Fabricar la PCB (tóner o CNC), montarla y probarla con `firmware/entrenador`.
 5. Informe final paso a paso y exposición.
-6. Botones B1..B5 en escalera (PC5): soldarlos, medir la lectura de cada uno y agregar `boton(n)` a la
-   biblioteca y al lenguaje. La PCB de `kicad/` todavía no los incluye.
+6. Actividad 15.3: LCD I2C en PC4/PC5 y ESP32 en lugar del Uno ([`INTEGRADOR.md`](INTEGRADOR.md)).
+   La escalera de botones B1..B5 se descartó: no se montó en la placa.
 
 ## Estructura de la carpeta
 

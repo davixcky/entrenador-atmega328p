@@ -14,6 +14,8 @@ import {
   type Programa,
 } from '@entrenador/lenguaje'
 
+import { aplicarAjustes, type Ajustes } from './ajustes'
+
 const CLAVE_GUARDADO = 'entrenador.proyecto'
 
 export type Vista = 'codigo' | 'diagrama'
@@ -62,7 +64,7 @@ function cargar(): Estado {
   return desdeCodigo(ejemplos[0].codigo, 0)
 }
 
-export function useProyecto() {
+export function useProyecto(ajustes: Ajustes) {
   const [estado, setEstado] = useState<Estado>(cargar)
 
   useEffect(() => {
@@ -109,12 +111,14 @@ export function useProyecto() {
       } else {
         programa = analizar(estado.codigo)
       }
+      // Ajustes de la app (luz y cursor del LCD, brillo) al inicio del programa
+      programa = aplicarAjustes(programa, ajustes)
       const { bytes, variables } = compilar(programa)
       return { bytes, programa, variables, error: null, sueltos }
     } catch (e) {
       return { bytes: null, programa: null, variables: null, error: comoError(e), sueltos }
     }
-  }, [estado.codigo, estado.grafo, estado.editado])
+  }, [estado.codigo, estado.grafo, estado.editado, ajustes])
 
   // Reescribe el texto con el formato estandar; con errores no hace nada y devuelve false
   const formatearCodigo = useCallback(() => {

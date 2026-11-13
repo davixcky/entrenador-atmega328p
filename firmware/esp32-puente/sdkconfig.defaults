@@ -1,0 +1,18 @@
+# UART0 (el USB de la DevKit) es solo del protocolo con la app: sin consola ni logs.
+# Al resetear la ROM igual imprime unas lineas a 115200; la app las ignora.
+CONFIG_ESP_CONSOLE_NONE=y
+CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y
+CONFIG_LOG_DEFAULT_LEVEL_NONE=y
+
+# DevKit con 4 MB: particion de app de 1.5 MB (Wi-Fi + TLS no entra holgado en 1 MB)
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+
+# Ticks de 1 ms: esperas de ISP y del UART mas finas
+CONFIG_FREERTOS_HZ=1000
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144
+
+# HTTPS al Supabase alojado con los certificados raiz incluidos
+CONFIG_ESP_HTTP_CLIENT_ENABLE_HTTPS=y
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y

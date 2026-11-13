@@ -17,6 +17,7 @@ static int16_t numero = 0;
 static bool displays = false;
 static int16_t pot = 512;
 
+#include "simulacion.h"
 #include "../../firmware/bloques/maquina.h"
 
 void hwLed(uint8_t n, bool encendido) {
@@ -26,10 +27,20 @@ void hwLed(uint8_t n, bool encendido) {
 void hwLeds(uint8_t valor) { leds = valor; }
 void hwNumero(int16_t valor) { numero = valor; displays = true; }
 void hwApagarDisplays() { displays = false; }
-int16_t hwPot() { return pot; }
+int16_t hwPot() { return sim::leerPot(pot); }
 int16_t hwDip() { return 0; }
 int16_t hwAleatorio(int16_t min, int16_t max) { return (int16_t)(min + rand() % (max - min + 1)); }
 unsigned long hwMillis() { return ahora; }
+void hwBrillo(int16_t porcentaje) { sim::ponerBrillo(porcentaje); }
+void hwLcdLimpiar() { sim::lcdLimpiar(); }
+void hwLcdTexto(int16_t fila, int16_t columna, const char *texto) { sim::lcdEscribir(fila, columna, texto); }
+void hwLcdNumero(int16_t fila, int16_t columna, int16_t numero, int16_t ancho) { sim::lcdNumero(fila, columna, numero, ancho); }
+void hwLcdNube(int16_t fila) { sim::lcdNube(fila); }
+void hwInvertirPot(int16_t estado) { sim::potInvertido = estado != 0; }
+void hwLcdLuz(int16_t estado) { sim::ponerLuz(estado); }
+void hwLcdCursor(int16_t modo) { sim::ponerCursor(modo); }
+void hwNubeEnviar(int16_t n, int16_t valor) { sim::nubeEnviar(n, valor); }
+int16_t hwNube(int16_t n) { return sim::nube(n); }
 
 static void imprimirLeds(uint8_t v, char *s) {
   for (int i = 7; i >= 0; i--) *s++ = (v >> i) & 1 ? '#' : '.';
@@ -59,15 +70,19 @@ int main(int argc, char **argv) {
   uint8_t ultLeds = 0xFF;
   int16_t ultNumero = -999;
   bool ultDisplays = !displays;
+  char ultExtra[128] = "";
   for (ahora = 0; ahora <= duracion && corriendo; ahora++) {
     maquinaPaso(50);
     if (soloEsperas && !esperando && corriendo) continue;
-    if (leds != ultLeds || numero != ultNumero || displays != ultDisplays) {
+    char extra[128];
+    sim::extra(extra, sizeof(extra));
+    if (leds != ultLeds || numero != ultNumero || displays != ultDisplays || strcmp(extra, ultExtra) != 0) {
       char l[9];
       imprimirLeds(leds, l);
-      if (displays) printf("%6lu ms  LEDs %s  displays %d\n", ahora, l, numero);
-      else printf("%6lu ms  LEDs %s  displays apagados\n", ahora, l);
+      if (displays) printf("%6lu ms  LEDs %s  displays %d%s\n", ahora, l, numero, extra);
+      else printf("%6lu ms  LEDs %s  displays apagados%s\n", ahora, l, extra);
       ultLeds = leds, ultNumero = numero, ultDisplays = displays;
+      strcpy(ultExtra, extra);
     }
   }
   printf("fin: %s, error %u\n", corriendo ? "sigue corriendo" : "detenido", maquinaError);

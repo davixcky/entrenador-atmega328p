@@ -193,8 +193,10 @@ class Sheet:
         self.text(title, x1 + 1.27, y1 + 1.27, size=2, bold=True)
 
     # -- simbolos ---------------------------------------------------------
-    def symbol(self, libid, ref, value, x, y, r=0, footprint='', fields=None, hide_value=False, mirror=False):
-        """mirror=True refleja el simbolo en x (pines de la izquierda pasan a la derecha); solo con r=0."""
+    def symbol(self, libid, ref, value, x, y, r=0, footprint='', fields=None, hide_value=False, mirror=False,
+               en_placa=True):
+        """mirror=True refleja el simbolo en x (pines de la izquierda pasan a la derecha); solo con r=0.
+        en_placa=False: modulo externo cableado aparte (ESP32, LCD): no va en la PCB."""
         flat = self.libsym(libid)
         is_power = ref.startswith('#')
         props = []
@@ -218,7 +220,7 @@ class Sheet:
         node = [S('symbol'), [S('lib_id'), libid], [S('at'), x, y, r]] + ([[S('mirror'), S('y')]] if mirror else []) + [
                 [S('unit'), 1],
                 [S('exclude_from_sim'), S('no')], [S('in_bom'), S('no') if is_power else S('yes')],
-                [S('on_board'), S('no') if is_power else S('yes')], [S('dnp'), S('no')],
+                [S('on_board'), S('no') if is_power or not en_placa else S('yes')], [S('dnp'), S('no')],
                 [S('uuid'), uid()]] + props
         pos = {}
         for num, (lx, ly, _) in lib_pins(flat).items():
@@ -252,14 +254,14 @@ class Sheet:
             self.nets[rp] = name
 
     def part(self, libid, ref, value, x, y, r=0, footprint='', conns=None, stub=2.54, stubs=None,
-             fields=None, hide_value=False, mirror=False):
+             fields=None, hide_value=False, mirror=False, en_placa=True):
         """Coloca un componente y conecta cada pin segun conns {pin: red}.
 
         red puede ser: 'GND', '+5V' (simbolo de alimentacion), 'NC' (sin conexion),
         None (el pin se conecta a mano con wire()) o un nombre de etiqueta.
         Devuelve {pin: (x, y)} con la posicion de cada pin.
         """
-        flat, pos = self.symbol(libid, ref, value, x, y, r, footprint, fields, hide_value, mirror)
+        flat, pos = self.symbol(libid, ref, value, x, y, r, footprint, fields, hide_value, mirror, en_placa)
         done = set()
         for num, (lx, ly, la) in lib_pins(flat).items():
             px, py = pos[num]
@@ -286,25 +288,71 @@ class Sheet:
         return pos
 
     # -- archivo ----------------------------------------------------------
-    def save(self, path):
+    def save(self, path, titulo=None, papel='A3'):
+        """titulo = (titulo, fecha, revision, comentario 2); por defecto el del entrenador."""
+        titulo = titulo or ('Entrenador de microcontroladores ATmega328P (DIP)', '2026-10-30', '3',
+                            'Actividad 10.1.12 · PCB de una cara (tóner o CNC)')
         body = [[S('junction'), [S('at'), x, y], [S('diameter'), 0], [S('color'), 0, 0, 0, 0], [S('uuid'), uid()]]
                 for x, y in self.junctions()]
         body += [[S('wire'), [S('pts'), [S('xy'), a[0], a[1]], [S('xy'), b[0], b[1]]],
                   [S('stroke'), [S('width'), 0], [S('type'), S('default')]], [S('uuid'), uid()]]
                  for a, b in self.wires]
         doc = [S('kicad_sch'), [S('version'), 20250114], [S('generator'), 'eeschema'],
-               [S('generator_version'), '9.0'], [S('uuid'), ROOT_UUID], [S('paper'), 'A3'],
+               [S('generator_version'), '9.0'], [S('uuid'), ROOT_UUID], [S('paper'), papel],
                [S('title_block'),
-                [S('title'), 'Entrenador de microcontroladores ATmega328P (DIP)'],
-                [S('date'), '2026-10-30'], [S('rev'), '3'],
+                [S('title'), titulo[0]],
+                [S('date'), titulo[1]], [S('rev'), titulo[2]],
                 [S('company'), 'Universidad de la Costa (CUC) — Sistemas Embebidos 1'],
                 [S('comment'), 1, 'David Orozco · Jose Torres · Leo Rojas'],
-                [S('comment'), 2, 'Actividad 10.1.12 · PCB de una cara (tóner o CNC)']],
+                [S('comment'), 2, titulo[3]]],
                [S('lib_symbols')] + list(self.lib.values())] + body + self.items + [
             [S('sheet_instances'), [S('path'), '/', [S('page'), '1']]],
             [S('embedded_fonts'), S('no')]]
         with open(path, 'w', encoding='utf-8') as f:
             f.write(dump(doc) + '\n')
+
+
+# --------------------------------------------------------------------------
+# Simbolos propios (biblioteca Integrador.kicad_sym): ESP32 DevKitC y LCD I2C
+# --------------------------------------------------------------------------
+def _efectos(oculto=False):
+    e = [S('effects'), [S('font'), [S('size'), 1.27, 1.27]]]
+    if oculto:
+        e.append([S('hide'), S('yes')])
+    return e
+
+
+def simbolo(libid, ref, valor, descripcion, ancho, izquierda, derecha=()):
+    """Simbolo rectangular con pines pasivos: izquierda/derecha = [(numero, nombre), ...]."""
+    nombre = libid.split(':')[1]
+    filas = max(len(izquierda), len(derecha))
+    alto = 2.54 * (filas + 1)
+    y0 = round(alto / 2 / 1.27) * 1.27
+    pines = []
+    for lado, lista in ((-1, izquierda), (1, derecha)):
+        for i, (num, txt) in enumerate(lista):
+            x = lado * (ancho / 2 + 5.08)
+            pines.append([S('pin'), S('passive'), S('line'), [S('at'), x, round(y0 - 2.54 * (i + 1), 4), 0 if lado < 0 else 180],
+                          [S('length'), 5.08], [S('name'), txt, _efectos()], [S('number'), num, _efectos()]])
+    prop = lambda k, v, y, oculto=False: [S('property'), k, v, [S('at'), 0, y, 0], _efectos(oculto)]
+    return [S('symbol'), libid, [S('pin_names'), [S('offset'), 1.016]], [S('exclude_from_sim'), S('no')],
+            [S('in_bom'), S('yes')], [S('on_board'), S('yes')],
+            prop('Reference', ref, y0 + 2.54), prop('Value', valor, -y0 - 2.54),
+            prop('Footprint', '', 0, True), prop('Datasheet', '', 0, True), prop('Description', descripcion, 0, True),
+            [S('symbol'), nombre + '_0_1',
+             [S('rectangle'), [S('start'), -ancho / 2, y0], [S('end'), ancho / 2, -y0],
+              [S('stroke'), [S('width'), 0.254], [S('type'), S('default')]], [S('fill'), [S('type'), S('background')]]]],
+            [S('symbol'), nombre + '_1_1'] + pines]
+
+
+# Numeros de pin = posicion en los cabezales del ESP32-DevKitC V4 de 38 pines
+ESP32 = simbolo('Integrador:ESP32_DevKitC', 'U', 'ESP32-DevKitC', 'ESP32 NodeMCU / DevKit (WROOM-32): pines usados, por nombre de GPIO', 22.86,
+                izquierda=[('30', 'IO17/TX2'), ('31', 'IO16/RX2'), ('20', 'GND')],
+                derecha=[('1', '3V3'), ('19', '5V'), ('34', 'IO2/LED')])
+LCD = simbolo('Integrador:LCD_I2C', 'U', 'LCD 16x2 I2C', 'LCD 16x2 HD44780 con modulo PCF8574 (0x27 / 0x3F)', 15.24,
+              # numeros de pin del modulo (1 GND, 2 VCC, 3 SDA, 4 SCL); dibujados con VCC arriba y GND abajo
+              izquierda=[('2', 'VCC'), ('3', 'SDA'), ('4', 'SCL'), ('1', 'GND')])
+
 
 
 # --------------------------------------------------------------------------
@@ -497,7 +545,7 @@ def build():
     sh.box(12.7, 101.6, 132.08, 248.92, 'MICROCONTROLADOR')
     mcu = {'1': 'RESET', '2': 'RXD', '3': 'TXD', '9': 'XTAL1', '10': 'XTAL2', '7': '+5V', '20': '+5V',
            '8': 'GND', '22': 'GND', '21': 'AREF', '23': 'POT', '24': 'DIP1', '25': 'DIP2', '26': 'DIP3',
-           '27': 'DIP4', '28': 'BOTONES', '16': 'SEL_LED', '17': 'SEL_DEC', '18': 'SEL_UNI', '19': 'SCK'}
+           '27': 'DIP4', '28': 'SCL', '16': 'SEL_LED', '17': 'SEL_DEC', '18': 'SEL_UNI', '19': 'SCK'}
     pinnum = {'PD2': '4', 'PD3': '5', 'PD4': '6', 'PD5': '11', 'PD6': '12', 'PD7': '13', 'PB0': '14', 'PB1': '15'}
     for bit, p in enumerate(BUS_PINS):
         mcu[pinnum[p]] = 'BUS%d' % bit
@@ -566,7 +614,7 @@ def build():
             142.24, 194.31)
 
     # ---------------- Entradas ----------------------------------------------
-    sh.box(137.16, 210.82, 297.18, 278.13, 'ENTRADAS')
+    sh.box(137.16, 210.82, 238.76, 278.13, 'ENTRADAS')
     sh.part('Device:R_Potentiometer', 'RV1', '10k', 152.4, 241.3,
             footprint='entrenador:Pot_3pin_P5.00mm',
             conns={'1': '+5V', '3': 'GND', '2': 'POT'}, stub=5.08)
@@ -585,51 +633,6 @@ def build():
     sh.text('Pull-up interna (INPUT_PULLUP):\ninterruptor cerrado = 0, abierto = 1.\nDIP1..DIP4 → PC1..PC4 (A1..A4)',
             172.72, 256.54)
 
-    # Botones en escalera: una sola entrada analogica (PC5) para B1..B5. R14..R18 en serie
-    # desde +5V; cada boton une su punto de la cadena con BOTONES, que R19 baja a GND.
-    ych, yc = 228.6, 248.92
-    xs = 218.44
-    sh.power('+5V', xs, ych - 5.08, 'U')
-    sh.cable((xs, ych - 5.08), (xs, ych))
-    prev = (xs, ych)
-    taps = []
-    for i in range(5):
-        c = xs + 5.08 + i * 10.16
-        rpos = sh.part('Device:R', 'R%d' % (14 + i), '2.2k', c, ych, r=90, footprint=FP_R, fields=HORIZ)
-        izq, der = sorted(('1', '2'), key=lambda k: rpos[k][0])
-        tap = (c + 5.08, ych)
-        sh.cable(prev, rpos[izq])
-        sh.cable(rpos[der], tap)
-        sh.nets[('R%d' % (14 + i), izq)] = '+5V' if i == 0 else 'ESCALERA%d' % i
-        sh.nets[('R%d' % (14 + i), der)] = 'ESCALERA%d' % (i + 1)
-        prev = tap
-        taps.append(tap)
-    for i, (tx, ty) in enumerate(taps):
-        ref = 'SW%d' % (3 + i)
-        spos = sh.part('Switch:SW_Push', ref, 'B%d' % (i + 1), tx, ych + 10.16, r=90,
-                       footprint='Button_Switch_THT:SW_PUSH_6mm', fields=VLED)
-        arriba, abajo = sorted(('1', '2'), key=lambda k: spos[k][1])
-        sh.cable((tx, ty), spos[arriba])
-        sh.cable(spos[abajo], (tx, yc))
-        sh.nets[(ref, arriba)] = 'ESCALERA%d' % (i + 1)
-        sh.nets[(ref, abajo)] = 'BOTONES'
-    xr = taps[-1][0] + 7.62
-    xcap = xr + 10.16
-    sh.wire(xs + 2.54, yc, xcap, yc)
-    sh.label('BOTONES', xs + 2.54, yc, 'L')
-    r19 = sh.part('Device:R', 'R19', '10k', xr, yc + 7.62, footprint=FP_R, fields=VLED)
-    sh.cable((xr, yc), r19['1'])
-    sh.power('GND', *r19['2'], 'D')
-    c12 = sh.part('Device:C', 'C12', '0.1uF', xcap, yc + 7.62, footprint=FP_C, fields=VLED)
-    sh.cable((xcap, yc), c12['1'])
-    sh.power('GND', *c12['2'], 'D')
-    sh.nets[('R19', '1')] = sh.nets[('C12', '1')] = 'BOTONES'
-    sh.nets[('R19', '2')] = sh.nets[('C12', '2')] = 'GND'
-    sh.text('Botones B1..B5 en escalera → PC5 (A5, pin 28).\n'
-            'Sin pulsar: 0 V (R19). Bn: 5 V × 10k / (10k + n × 2,2k).\n'
-            'Lecturas: B1 838, B2 710, B3 616, B4 544, B5 487.\n'
-            'Dos a la vez: gana el menor. PC5 sin pull-up interna.',
-            218.44, 266.7)
 
     # ---------------- Puntos de prueba ---------------------------------------
     sh.box(302.26, 210.82, 406.4, 250.19, 'PUNTOS DE PRUEBA (lazos de alambre para el multímetro)')
@@ -640,23 +643,99 @@ def build():
     sh.text('VIN ≈ entrada − 0,7 V; +5V entre 4,8 y 5,2 V; POT de 0 a 5 V al girar;\n'
             'RESET en 5 V (0 V al pulsar).', 307.34, 240.03)
 
+    # ---------------- ESP32 y LCD I2C (actividad 15.3) ----------------------
+    # Modulos externos cableados aparte (en_placa=False): la PCB de kicad/ no los lleva.
+    sh.lib['Integrador:ESP32_DevKitC'] = ESP32
+    sh.lib['Integrador:LCD_I2C'] = LCD
+    x0 = 414.02
+    sh.box(x0, 15.24, 574.04, 172.72, 'ESP32 Y LCD I2C (actividad 15.3, INTEGRADOR.md)')
+
+    # LCD: es del ATmega (lcd_texto / lcd_numero en el programa), por I2C en los pines 27 y 28
+    sh.text('LCD 16x2 por I2C, conectado al ATMEGA (no al ESP32):', x0 + 5.08, 25.4, size=1.6, bold=True)
+    u6 = sh.part('Integrador:LCD_I2C', 'U6', 'LCD 16x2 I2C', x0 + 55.88, 50.8, en_placa=False,
+                 conns={'3': 'DIP4', '4': 'SCL'}, stub=10.16,
+                 fields={'Reference': (0, -10.16, None), 'Value': (0, 10.16, None)})
+    # +5V y GND del entrenador
+    xa = u6['2'][0] - 5.08
+    sh.cable(u6['2'], (xa, u6['2'][1]), (xa, u6['2'][1] - 5.08))
+    sh.power('+5V', xa, u6['2'][1] - 5.08, 'U')
+    sh.cable(u6['1'], (xa, u6['1'][1]), (xa, u6['1'][1] + 5.08))
+    sh.power('GND', xa, u6['1'][1] + 5.08, 'D')
+    sh.net('+5V', ('U6', '2'))
+    sh.net('GND', ('U6', '1'))
+    sh.text('SDA = pin 27 (PC4, comparte con DIP4: dejarlo ABIERTO).\n'
+            'SCL = pin 28 (PC5, libre: solo va al LCD).\n'
+            'Módulo PCF8574 (0x27 / 0x3F, se busca solo) con sus pull-ups.', x0 + 5.08, 66.04)
+
+    # ESP32: puente USB, Wi-Fi a la nube y grabacion del ATmega por ISP
+    sh.text('ESP32: puente USB <-> serie y Wi-Fi a la nube (solo TX/RX):', x0 + 5.08, 93.98, size=1.6, bold=True)
+    sh.part('Integrador:ESP32_DevKitC', 'U5', 'ESP32 NodeMCU USB-C', x0 + 96.52, 121.92, en_placa=False,
+            conns={'30': 'RXD', '31': 'ESP_RX', '20': 'GND',
+                   '1': 'NC', '19': 'NC', '34': 'NC'}, stub=7.62,
+            fields={'Reference': (0, -17.78, None), 'Value': (0, 17.78, None)})
+
+    # 5 V del ATmega -> 3.3 V del ESP32: divisores 1k / 2k
+    def divisor(ref_alto, ref_bajo, entrada, salida, x, y):
+        ra = sh.part('Device:R', ref_alto, '1k', x, y, footprint=FP_R, en_placa=False,
+                     fields={'Reference': (2.54, -1.27, 'left'), 'Value': (2.54, 1.27, 'left')})
+        rb = sh.part('Device:R', ref_bajo, '2k', x, y + 10.16, footprint=FP_R, en_placa=False,
+                     fields={'Reference': (2.54, -1.27, 'left'), 'Value': (2.54, 1.27, 'left')})
+        medio = (x, y + 5.08)
+        sh.cable(ra['1'], (x, ra['1'][1] - 2.54))
+        sh.label(entrada, x, ra['1'][1] - 2.54, 'U')
+        sh.cable(ra['2'], medio, rb['1'])
+        sh.cable(medio, (x + 10.16, medio[1]))
+        sh.label(salida, x + 10.16, medio[1], 'R')
+        sh.power('GND', *rb['2'], 'D')
+        sh.net(entrada, (ref_alto, '1'))
+        sh.net(salida, (ref_alto, '2'), (ref_bajo, '1'))
+        sh.net('GND', (ref_bajo, '2'))
+
+    divisor('R20', 'R21', 'TXD', 'ESP_RX', x0 + 20.32, 111.76)
+    sh.text('ATmega TX -> ESP32 RX2: divisor 1k / 2k (5 V -> 3.3 V), el ESP32 no tolera 5 V.\n'
+            'ESP32 TX2 -> ATmega RX: 3.3 V ya es un 1 (lee alto desde 3.0 V), va directo.\n'
+            'GND común. ESP32 por su USB, entrenador por J1/J4: no unir los 5 V.\n'
+            'Usar ESP32-WROOM (en un WROVER, IO16/IO17 son de la PSRAM).\n'
+            'El ESP32 no graba al ATmega: eso sigue con el Uno como ISP por J3.\n'
+            'Firmware: firmware/esp32-puente (ESP-IDF). Reemplaza al Uno en J2.', x0 + 5.08, 152.4)
+
     # ---------------- Notas -------------------------------------------------
     sh.text('NOTAS\n'
             '1. Alimentación de 9 a 12 V CC por J1 (jack) o J4 (bornera). D1 bloquea la polaridad invertida.\n'
             '2. Se programa por J3 con un Arduino Uno como ISP. Fusibles grabados: L 0xFF, H 0xDE, E 0xFD\n'
             '    (cristal de 16 MHz, Optiboot de 512 B, brown-out en 2,7 V). J2 lleva el serie de la app.\n'
             '3. Bus de 8 bits compartido: Q1, Q2 y Q3 encienden un solo grupo a la vez (multiplexado).\n'
-            '4. Entradas: potenciómetro en ADC0; DIP en PC1–PC4 con pull-up interna (cerrado = 0);\n'
-            '    botones B1–B5 en escalera en ADC5 (PC5).\n'
+            '4. Entradas: potenciómetro en ADC0; DIP en PC1–PC4 con pull-up interna (cerrado = 0).\n'
+            '    PC5 (pin 28) queda libre para el SCL del LCD.\n'
             '5. PCB de una cara: el DIP lleva las señales en los pines 8–5 y GND en 1–4 para no cruzar\n'
             '    pistas. Puentes de alambre en kicad/fabricacion/PUENTES.md.\n'
             '6. La placa armada se cableó a mano; el orden del bus es el de SALIDAS, no el de la PCB de kicad/.\n'
             '7. Revisar al armar: emisor de Q1 a GND; SEL_LED, SEL_DEC y SEL_UNI a los pines 16, 17 y 18;\n'
-            '    GND del Uno unido al de la placa (sin él el ISP lee la firma 00 00 00).',
+            '    GND del Uno unido al de la placa (sin él el ISP lee la firma 00 00 00).\n'
+            '8. Actividad 15.3: el ESP32 reemplaza al Uno solo en el serie (J2; el ISP sigue con el Uno) y el\n'
+            '    LCD I2C va a los pines 27-28 (DIP4 abierto). U5, U6, R20 y R21 se cablean aparte (no van en la PCB).',
             17.78, 252.73, size=1.4)
 
-    sh.save(OUT)
+    sh.save(OUT, titulo=('Entrenador de microcontroladores ATmega328P (DIP)', '2026-11-12', '4',
+                         'Actividades 10.1.12 y 15.3 (ESP32, LCD I2C)'), papel='A2')
+    guardar_biblioteca(os.path.dirname(OUT))
     return sh
+
+
+def guardar_biblioteca(carpeta):
+    """Integrador.kicad_sym + sym-lib-table: los simbolos propios, para editar en KiCad."""
+    simbolos = []
+    for sim in (ESP32, LCD):
+        s = list(sim)
+        s[1] = sim[1].split(':')[1]
+        simbolos.append(s)
+    lib = [S('kicad_symbol_lib'), [S('version'), 20241209], [S('generator'), 'kicad_symbol_editor'],
+           [S('generator_version'), '9.0']] + simbolos
+    with open(os.path.join(carpeta, 'Integrador.kicad_sym'), 'w', encoding='utf-8') as f:
+        f.write(dump(lib) + '\n')
+    with open(os.path.join(carpeta, 'sym-lib-table'), 'w', encoding='utf-8') as f:
+        f.write('(sym_lib_table\n  (version 7)\n  (lib (name "Integrador")(type "KiCad")'
+                '(uri "${KIPRJMOD}/Integrador.kicad_sym")(options "")(descr "ESP32 DevKitC y LCD I2C (actividad 15.3)"))\n)\n')
 
 
 if __name__ == '__main__':

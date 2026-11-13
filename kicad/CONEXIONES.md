@@ -17,7 +17,6 @@ En la protoboard, marcar cada conexion a medida que se hace.
 | [ ] | J3 | ICSP | 2 | VCC |
 | [ ] | R1 | 1k | 1 |  |
 | [ ] | R2 | 10k | 1 |  |
-| [ ] | R14 | 2.2k | 1 |  |
 | [ ] | RV1 | 10k | 1 | 1 |
 | [ ] | TP4 | +5V | 1 | 1 |
 | [ ] | U1 | ATmega328P-PU | 7 | VCC |
@@ -38,7 +37,6 @@ En la protoboard, marcar cada conexion a medida que se hace.
 | [ ] | C8 | 22pF | 2 |  |
 | [ ] | C9 | 22pF | 2 |  |
 | [ ] | C11 | 10nF | 2 |  |
-| [ ] | C12 | 0.1uF | 2 |  |
 | [ ] | D2 | LED ON | 1 | K |
 | [ ] | J1 | 9-12 V DC | 2 |  |
 | [ ] | J2 | FTDI | 1 | GND |
@@ -48,7 +46,6 @@ En la protoboard, marcar cada conexion a medida que se hace.
 | [ ] | Q1 | 2N2222 | 1 | E |
 | [ ] | Q2 | 2N2222 | 1 | E |
 | [ ] | Q3 | 2N2222 | 1 | E |
-| [ ] | R19 | 10k | 2 |  |
 | [ ] | RV1 | 10k | 3 | 3 |
 | [ ] | SW1 | Pulsador | 1 | 1 |
 | [ ] | SW2 | DIP x4 | 1 |  |
@@ -388,54 +385,8 @@ En la protoboard, marcar cada conexion a medida que se hace.
 | [ ] | U4 | 5161AS UNIDADES | 3 | CC |
 | [ ] | U4 | 5161AS UNIDADES | 8 | CC |
 
-## BOTONES
+## SCL
 
 | Hecho | Componente | Valor | Pin | Funcion del pin |
 |:-:|---|---|---:|---|
-| [ ] | C12 | 0.1uF | 1 |  |
-| [ ] | R19 | 10k | 1 |  |
-| [ ] | SW3 | B1 | 1 | 1 |
-| [ ] | SW4 | B2 | 1 | 1 |
-| [ ] | SW5 | B3 | 1 | 1 |
-| [ ] | SW6 | B4 | 1 | 1 |
-| [ ] | SW7 | B5 | 1 | 1 |
 | [ ] | U1 | ATmega328P-PU | 28 | PC5 |
-
-## Net-(R14-Pad2)
-
-| Hecho | Componente | Valor | Pin | Funcion del pin |
-|:-:|---|---|---:|---|
-| [ ] | R14 | 2.2k | 2 |  |
-| [ ] | R15 | 2.2k | 1 |  |
-| [ ] | SW3 | B1 | 2 | 2 |
-
-## Net-(R15-Pad2)
-
-| Hecho | Componente | Valor | Pin | Funcion del pin |
-|:-:|---|---|---:|---|
-| [ ] | R15 | 2.2k | 2 |  |
-| [ ] | R16 | 2.2k | 1 |  |
-| [ ] | SW4 | B2 | 2 | 2 |
-
-## Net-(R16-Pad2)
-
-| Hecho | Componente | Valor | Pin | Funcion del pin |
-|:-:|---|---|---:|---|
-| [ ] | R16 | 2.2k | 2 |  |
-| [ ] | R17 | 2.2k | 1 |  |
-| [ ] | SW5 | B3 | 2 | 2 |
-
-## Net-(R17-Pad2)
-
-| Hecho | Componente | Valor | Pin | Funcion del pin |
-|:-:|---|---|---:|---|
-| [ ] | R17 | 2.2k | 2 |  |
-| [ ] | R18 | 2.2k | 1 |  |
-| [ ] | SW6 | B4 | 2 | 2 |
-
-## Net-(R18-Pad2)
-
-| Hecho | Componente | Valor | Pin | Funcion del pin |
-|:-:|---|---|---:|---|
-| [ ] | R18 | 2.2k | 2 |  |
-| [ ] | SW7 | B5 | 2 | 2 |

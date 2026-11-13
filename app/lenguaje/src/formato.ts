@@ -46,6 +46,8 @@ export function formatearExpresion(e: Expresion): string {
   switch (e.tipo) {
     case 'numero':
       return numero(e.valor, e.base)
+    case 'texto':
+      return `"${e.valor}"`
     case 'variable':
       return e.nombre
     case 'llamada':

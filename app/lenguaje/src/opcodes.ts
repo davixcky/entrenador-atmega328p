@@ -27,10 +27,20 @@ export const OP = {
   LEDS: 0x32,
   NUMERO: 0x33,
   APAGAR_DISPLAYS: 0x34,
+  BRILLO: 0x35,
+  LCD_LIMPIAR: 0x36,
+  LCD_TEXTO: 0x37, // + largo + bytes ASCII del texto
+  LCD_NUMERO: 0x38,
+  NUBE_ENVIAR: 0x39,
+  LCD_LUZ: 0x3a,
+  LCD_CURSOR: 0x3b,
+  INVERTIR_POT: 0x3c,
+  LCD_NUBE: 0x3d,
   POT: 0x40,
   DIP: 0x41,
   INTERRUPTOR: 0x42,
   ALEATORIO: 0x43,
+  NUBE: 0x44,
 } as const
 
 // Limites de la maquina virtual
@@ -38,3 +48,5 @@ export const PROG_MAX = 768
 export const VARS_MAX = 32
 // Las ultimas variables quedan para los contadores ocultos de "repetir"
 export const VARS_USUARIO = 24
+// Columnas del LCD: un texto mas largo no cabe en una fila
+export const LCD_COLUMNAS = 16

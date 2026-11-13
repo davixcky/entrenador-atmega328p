@@ -80,4 +80,39 @@ siempre {
 }
 `,
   },
+  {
+    nombre: 'Integrador ESP32 (nube)',
+    codigo: `// Actividad 15.3: el pot va a la nube y VALOR1 vuelve como brillo del LED 0
+// (necesita el ESP32 con firmware/esp32-puente y el LCD por I2C)
+lcd_limpiar()
+lcd_texto(0, 0, "ADC:")
+lcd_texto(1, 0, "VALOR1:")
+leds(0b00000001)
+siempre {
+  adc = pot()
+  nube_enviar(1, adc)
+  valor1 = nube(1)
+  brillo(valor1)
+  lcd_numero(0, 10, adc, 4)
+  lcd_numero(1, 10, valor1, 4)
+  esperar(200)
+}
+`,
+  },
+  {
+    nombre: 'Control desde la nube',
+    codigo: `// Todo desde Supabase (tablero Nube o Studio, tabla controles):
+//   lcd1 / lcd2 -> filas del LCD, canal 2 -> LEDs, canal 3 -> displays
+// y el potenciómetro sube a la nube como ADC (canal 1)
+lcd_limpiar()
+siempre {
+  lcd_nube(0)
+  lcd_nube(1)
+  leds(nube(2))
+  mostrar(nube(3))
+  nube_enviar(1, pot())
+  esperar(200)
+}
+`,
+  },
 ]

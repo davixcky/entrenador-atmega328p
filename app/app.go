@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -18,6 +19,9 @@ const periodoTelemetria = 150 * time.Millisecond
 // Fallos seguidos de telemetria antes de avisar que el entrenador no responde.
 const fallosPermitidos = 5
 
+// La pantalla (LCD y brillo, comando P) se pide cada tantas vueltas de telemetria.
+const vueltasPantalla = 3
+
 var errDesconectado = errors.New("no hay conexion con el entrenador")
 
 // App expone al frontend (wailsjs/go/main/App) la conexion serie y la grabacion.
@@ -28,6 +32,7 @@ type App struct {
 	con        *conexion
 	entrenador bool // el entrenador respondio al saludo
 	detener    chan struct{}
+	pausada    atomic.Bool // sin telemetria mientras se graba por ISP
 }
 
 type Puerto struct {
@@ -76,7 +81,9 @@ func (a *App) ListarPuertos() ([]Puerto, error) {
 		puertos = append(puertos, Puerto{
 			Nombre:      d.Name,
 			Descripcion: desc,
-			EsArduino:   strings.EqualFold(d.VID, "2341") || strings.EqualFold(d.VID, "2a03"),
+			// Uno (2341, 2a03) o el conversor USB-serie del ESP32 (CP210x 10c4, CH340 1a86)
+			EsArduino: strings.EqualFold(d.VID, "2341") || strings.EqualFold(d.VID, "2a03") ||
+				strings.EqualFold(d.VID, "10c4") || strings.EqualFold(d.VID, "1a86"),
 		})
 	}
 	return puertos, nil
@@ -149,11 +156,17 @@ func (a *App) sondear(con *conexion, detener chan struct{}) {
 	ticker := time.NewTicker(periodoTelemetria)
 	defer ticker.Stop()
 	fallos := 0
+	vuelta := 0
+	var pantalla *Pantalla
+	conPantalla := true // el firmware 1 responde ERR a P: se deja de pedir
 	for {
 		select {
 		case <-detener:
 			return
 		case <-ticker.C:
+		}
+		if a.pausada.Load() {
+			continue
 		}
 		t, err := con.telemetria()
 		if err != nil {
@@ -164,6 +177,16 @@ func (a *App) sondear(con *conexion, detener chan struct{}) {
 			}
 			continue
 		}
+		if conPantalla && vuelta%vueltasPantalla == 0 {
+			p, err := con.pantalla()
+			if err == nil {
+				pantalla = p
+			} else if strings.Contains(err.Error(), "ERR") {
+				conPantalla = false
+			}
+		}
+		vuelta++
+		t.Pantalla = pantalla
 		if fallos >= fallosPermitidos || !a.Estado().Entrenador {
 			a.cambiarEntrenador(con, true)
 			a.registrar("Entrenador conectado")
@@ -262,6 +285,25 @@ func (a *App) BorrarGuardado() error {
 	}
 	a.registrar("Programa guardado borrado")
 	return nil
+}
+
+// PausarTelemetria deja de pedir telemetria: al grabar por ISP el ATmega queda en reset.
+func (a *App) PausarTelemetria(pausa bool) {
+	a.pausada.Store(pausa)
+}
+
+// ComandoPuente envia una linea tal cual y devuelve la respuesta (OK...). Con el ESP32
+// sirve para sus comandos @ (configuracion, grabar el ATmega por ISP); el frontend
+// arma esos comandos (frontend/src/backend/), igual en la app web y en la de escritorio.
+func (a *App) ComandoPuente(linea string, esperaMs int) (string, error) {
+	con, err := a.conexionActual()
+	if err != nil {
+		return "", err
+	}
+	if esperaMs <= 0 {
+		esperaMs = 1000
+	}
+	return con.transaccion(linea, time.Duration(esperaMs)*time.Millisecond)
 }
 
 func (a *App) RutaAvrdude() (string, error) {

@@ -46,6 +46,14 @@ export function desensamblar(bytes: number[], variables?: Map<string, number>): 
         i.bytes.push(bytes[pc])
         i.operando = variable(bytes[pc++])
         break
+      case OP.LCD_TEXTO: {
+        const largo = bytes[pc] ?? 0
+        const texto = bytes.slice(pc + 1, pc + 1 + largo)
+        i.bytes.push(largo, ...texto)
+        i.operando = JSON.stringify(String.fromCharCode(...texto))
+        pc += 1 + largo
+        break
+      }
       case OP.SALTO:
       case OP.SALTO_SI_CERO:
         i.destino = u16()

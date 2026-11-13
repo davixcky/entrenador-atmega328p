@@ -1,4 +1,7 @@
-# Publica el sitio (web/, Astro) en GitHub Pages en cada push a main.
+# Publica el sitio (web/, Astro) en GitHub Pages en cada push a main, con la app web del
+# entrenador (app/frontend) en /app/: programador por Web Serial y tablero de la nube.
+# La URL de Supabase es publica; la clave anon sale de la variable del repo
+# SUPABASE_ANON_KEY (Settings > Variables). Sin ella la app la pide en Nube > Conexion.
 name: Sitio web
 
 on:
@@ -29,6 +32,21 @@ jobs:
         working-directory: web
       - run: npm run build
         working-directory: web
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/frontend/package-lock.json
+      - run: npm ci
+        working-directory: app/frontend
+      - run: npm run build -- --outDir ../../web/dist/app --emptyOutDir
+        working-directory: app/frontend
+        env:
+          VITE_SUPABASE_URL: https://nwxkaffuyuubapbptlir.supabase.co
+          VITE_SUPABASE_URL_ALOJADO: https://nwxkaffuyuubapbptlir.supabase.co
+          VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_ANON_KEY_ALOJADO: ${{ vars.SUPABASE_ANON_KEY }}
+          VITE_DISPOSITIVO: entrenador-1
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/dist

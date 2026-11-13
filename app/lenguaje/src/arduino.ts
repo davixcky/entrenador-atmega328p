@@ -125,6 +125,8 @@ class Generador {
     switch (e.tipo) {
       case 'numero':
         return numero(e.valor, e.base)
+      case 'texto':
+        return `"${e.valor}"` // el compilador ya comprobo que es ASCII sin comillas ni barras
       case 'variable':
         // Las constantes (encendido, verdadero...) existen con el mismo nombre en la biblioteca
         return e.nombre in CONSTANTES ? e.nombre : this.nombre(e.nombre)

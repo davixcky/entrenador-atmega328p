@@ -2,7 +2,7 @@
 import type { Expresion, OpBinario, Programa, Sentencia } from './ast.ts'
 import { ErrorLenguaje } from './errores.ts'
 import { CONSTANTES, FUNCIONES } from './funciones.ts'
-import { OP, PROG_MAX, VARS_MAX, VARS_USUARIO } from './opcodes.ts'
+import { LCD_COLUMNAS, OP, PROG_MAX, VARS_MAX, VARS_USUARIO } from './opcodes.ts'
 
 const OPS_BINARIOS: Record<OpBinario, number> = {
   '+': OP.SUMA,
@@ -144,8 +144,31 @@ function llamada(e: Emisor, nombre: string, args: Expresion[], comoValor: boolea
     const esperados = f.parametros.length === 0 ? 'ningún valor' : `${f.parametros.length} (${f.parametros.join(', ')})`
     throw new ErrorLenguaje(`"${nombre}" recibe ${esperados} y se le dieron ${args.length}`, { rango })
   }
-  for (const a of args) expresion(e, a)
+  const textos = f.textos ?? []
+  args.forEach((a, i) => {
+    if (textos.includes(i)) {
+      if (a.tipo !== 'texto') {
+        throw new ErrorLenguaje(`"${f.parametros[i]}" de "${nombre}" va entre comillas, por ejemplo "Hola"`, { rango: a.rango ?? rango })
+      }
+    } else {
+      expresion(e, a)
+    }
+  })
   e.op(...f.codigo)
+  for (const i of textos) e.op(...bytesTexto(args[i] as Extract<Expresion, { tipo: 'texto' }>))
+}
+
+// Largo + caracteres. El LCD solo tiene ASCII basico (sin tildes ni eñe) y 16 columnas.
+function bytesTexto(t: Extract<Expresion, { tipo: 'texto' }>): number[] {
+  if (t.valor.length > LCD_COLUMNAS) {
+    throw new ErrorLenguaje(`El texto tiene ${t.valor.length} caracteres y en una fila del LCD caben ${LCD_COLUMNAS}`, { rango: t.rango })
+  }
+  const codigos = [...t.valor].map((c) => c.codePointAt(0)!)
+  const malo = [...t.valor].find((c, i) => codigos[i] < 32 || codigos[i] > 126 || c === '\\')
+  if (malo !== undefined) {
+    throw new ErrorLenguaje(`El LCD no puede mostrar "${malo}": usa letras sin tilde, números y signos básicos`, { rango: t.rango })
+  }
+  return [codigos.length, ...codigos]
 }
 
 function expresion(e: Emisor, x: Expresion): void {
@@ -153,6 +176,8 @@ function expresion(e: Emisor, x: Expresion): void {
     case 'numero':
       e.num(x.valor)
       return
+    case 'texto':
+      throw new ErrorLenguaje('Un texto entre comillas solo puede ir en lcd_texto(fila, columna, "texto")', { rango: x.rango })
     case 'variable': {
       const constante = CONSTANTES[x.nombre]
       if (constante !== undefined) {

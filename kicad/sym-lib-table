@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "Integrador")(type "KiCad")(uri "${KIPRJMOD}/Integrador.kicad_sym")(options "")(descr "ESP32 DevKitC y LCD I2C (actividad 15.3)"))
+)

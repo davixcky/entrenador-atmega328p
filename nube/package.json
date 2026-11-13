@@ -1,0 +1,16 @@
+{
+  "name": "entrenador-nube",
+  "private": true,
+  "description": "Backend Supabase del circuito integrador (entrenador ATmega328P + ESP32)",
+  "scripts": {
+    "start": "supabase start",
+    "stop": "supabase stop",
+    "reset": "supabase db reset",
+    "estado": "supabase status",
+    "llaves": "supabase status -o env",
+    "probar": "bash pruebas/probar-rest.sh"
+  },
+  "devDependencies": {
+    "supabase": "3.1.0"
+  }
+}

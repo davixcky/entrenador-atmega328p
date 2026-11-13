@@ -1,6 +1,15 @@
 // Vista en vivo del entrenador y control manual de LEDs y displays.
 import { useState } from 'react'
+import type React from 'react'
 import { Display7, segmentosDe } from './Display7'
+
+export interface Pantalla {
+  lcd: number // 0 = el programa no usa el LCD, 1 = conectado, 2 = sin respuesta por I2C
+  brillo: number // 0..100, brillo de los LEDs
+  lineas: [string, string]
+  luz?: number // 1 luz de fondo encendida (falta en bloques 2.0)
+  cursor?: number // 0 sin cursor, 1 raya, 2 parpadeo
+}
 
 export interface Telemetria {
   pot: number
@@ -9,6 +18,8 @@ export interface Telemetria {
   numero: number | null
   corriendo: boolean
   error: number
+  // Firmware bloques 2 (comando P); falta con el firmware 1
+  pantalla?: Pantalla | null
 }
 
 const ERRORES = ['', 'pila llena', 'pila vacía', 'instrucción inválida', 'salto fuera del programa', 'variable inválida']
@@ -20,11 +31,53 @@ interface Props {
   onNumero: (valor: number | null) => void
 }
 
+const LCD_VACIO: [string, string] = ['', '']
+
+// LCD 16x2: lo que el programa escribio (el firmware guarda una copia aunque no haya LCD).
+// Siempre se ve, como los displays; en blanco hasta que llegan datos.
+function Lcd({ pantalla }: { pantalla: Pantalla | null }) {
+  const estado = !pantalla
+    ? { clase: 'chip', texto: 'Sin datos (firmware bloques 2)' }
+    : pantalla.lcd === 0
+      ? { clase: 'chip', texto: 'El programa no usa el LCD' }
+      : pantalla.lcd === 1
+        ? { clase: 'chip chip-ok', texto: 'LCD conectado' }
+        : { clase: 'chip chip-error', texto: 'Sin respuesta: revisa SDA/SCL y deja DIP4 abierto' }
+  const lineas = pantalla?.lineas ?? LCD_VACIO
+  const sinLuz = pantalla?.luz === 0
+  const cursor = ['', 'cursor: raya', 'cursor: parpadeo'][pantalla?.cursor ?? 0] ?? ''
+  const clases = ['lcd', !pantalla || pantalla.lcd === 0 ? 'lcd-apagado' : '', sinLuz ? 'lcd-sin-luz' : ''].filter(Boolean).join(' ')
+  return (
+    <div className="lcd-bloque">
+      <div className="lcd-cabecera">
+        <span>
+          LCD 16x2 (I2C){sinLuz && ' · luz apagada'}
+          {cursor && ` · ${cursor}`}
+        </span>
+        <span className={estado.clase}>{estado.texto}</span>
+      </div>
+      <div className={clases} role="img" aria-label={`LCD: ${lineas[0].trimEnd()} / ${lineas[1].trimEnd()}`}>
+        {lineas.map((l, f) => (
+          <div key={f} className="lcd-fila">
+            {[...l.padEnd(16).slice(0, 16)].map((c, i) => (
+              <span key={i} className="lcd-celda">
+                {c === ' ' ? ' ' : c}
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function Placa({ t, habilitado, onLeds, onNumero }: Props) {
   const [numeroManual, setNumeroManual] = useState('42')
   const [decenas, unidades] = segmentosDe(t?.numero ?? null)
   const leds = t?.leds ?? 0
   const pot = t?.pot ?? 0
+  const pantalla = t?.pantalla ?? null
+  const brillo = pantalla?.brillo ?? 100
 
   let estado = 'Sin datos'
   let claseEstado = 'chip'
@@ -53,7 +106,13 @@ export function Placa({ t, habilitado, onLeds, onNumero }: Props) {
       </header>
 
       <div className="placa-salidas">
-        <div className="leds" role="group" aria-label="LEDs (clic para cambiar)">
+        <div
+          className="leds"
+          role="group"
+          aria-label="LEDs (clic para cambiar)"
+          style={{ '--brillo': brillo === 0 ? 0 : 0.2 + (0.8 * brillo) / 100 } as React.CSSProperties}
+          title={brillo < 100 ? `Brillo ${brillo} %` : undefined}
+        >
           {[7, 6, 5, 4, 3, 2, 1, 0].map((i) => {
             const on = (leds >> i) & 1
             return (
@@ -76,6 +135,13 @@ export function Placa({ t, habilitado, onLeds, onNumero }: Props) {
           <Display7 segmentos={unidades} titulo="Unidades" />
         </div>
       </div>
+
+      <Lcd pantalla={pantalla} />
+      {brillo < 100 && (
+        <p className="nota">
+          Brillo de los LEDs: <span className="mono">{brillo} %</span>
+        </p>
+      )}
 
       <div className="medidor">
         <div className="medidor-cabecera">

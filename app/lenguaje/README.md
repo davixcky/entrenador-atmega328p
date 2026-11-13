@@ -68,6 +68,15 @@ siempre {
 | `esperar(ms)` | Pausa sin bloquear el firmware |
 | `mostrar(n)` | Número 0 a 99 en los displays (fuera de rango muestra `--`) |
 | `apagar_displays()` | Apaga los displays |
+| `brillo(porcentaje)` | Brillo de los LEDs de 0 a 100 % (PWM) |
+| `lcd_limpiar()` | Borra el LCD por I2C |
+| `lcd_texto(fila, columna, "texto")` | Texto entre comillas en el LCD (fila 0–1, columna 0–15; hasta 16 caracteres ASCII, sin tildes) |
+| `lcd_numero(fila, columna, numero, ancho)` | Número alineado a la derecha en `ancho` columnas (1 a 6) |
+| `lcd_luz(estado)` | Luz de fondo del LCD: `encendido` (al iniciar) o `apagado` |
+| `lcd_nube(fila)` | Escribe en la fila 0 o 1 del LCD el texto que llega de la nube (`lcd1` / `lcd2` en Supabase) |
+| `invertir_pot(estado)` | Con `encendido`, `pot()` y `pot99()` van al revés (1023 − lectura); también lo que muestra la app |
+| `lcd_cursor(modo)` | Cursor del LCD: 0 sin cursor (al iniciar), 1 raya fija, 2 bloque que parpadea |
+| `nube_enviar(n, valor)` | Manda un valor a la nube por el ESP32 (n de 1 a 4) |
 | `leds(valor)` | Los 8 LEDs en binario; el bit 0 es el LED de abajo |
 | `led(n, estado)` | Enciende o apaga el LED n (0 a 7) |
 
@@ -80,6 +89,7 @@ siempre {
 | `dip()` | DIP switch, 0 a 15 |
 | `interruptor(n)` | Interruptor n (1 a 4) del DIP: 1 cerrado, 0 abierto |
 | `aleatorio(min, max)` | Número al azar entre min y max |
+| `nube(n)` | Último valor recibido de la nube por el ESP32 (n de 1 a 4; 0 hasta que llegue uno) |
 | `verdadero`, `falso`, `encendido`, `apagado` | 1, 0, 1, 0 |
 
 Operadores, de menor a mayor precedencia: `o`, `y`, `no`,

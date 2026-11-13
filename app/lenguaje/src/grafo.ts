@@ -17,6 +17,14 @@ export type TipoNodo =
   | 'led'
   | 'esperar'
   | 'apagar_displays'
+  | 'brillo'
+  | 'lcd_limpiar'
+  | 'lcd_texto'
+  | 'lcd_numero'
+  | 'lcd_luz'
+  | 'lcd_cursor'
+  | 'lcd_nube'
+  | 'nube_enviar'
   | 'llamada'
   | 'si'
   | 'mientras'
@@ -32,7 +40,8 @@ export type Salida = 'sig' | 'cuerpo' | 'entonces' | 'sino'
 export interface Campo {
   nombre: string
   etiqueta: string
-  // expresion: se analiza con el lenguaje; variable: un nombre; opcion: lista fija
+  // expresion: se analiza con el lenguaje; variable: un nombre; opcion: lista fija;
+  // texto: tal cual (en los nodos de instruccion es un texto entre comillas, sin escribirlas)
   tipo: 'expresion' | 'variable' | 'opcion' | 'texto'
   opciones?: string[]
   inicial: string
@@ -40,7 +49,7 @@ export interface Campo {
 
 export interface DefinicionNodo {
   titulo: string
-  categoria: 'control' | 'salidas' | 'datos' | 'notas'
+  categoria: 'control' | 'salidas' | 'lcd' | 'nube' | 'datos' | 'notas'
   campos: Campo[]
   // Salidas ademas de "sig" (inicio solo tiene "sig")
   ramas: Salida[]
@@ -79,6 +88,62 @@ export const NODOS: Record<TipoNodo, DefinicionNodo> = {
     ayuda: 'LED 0 a 7; estado encendido/apagado o cualquier condición',
   },
   apagar_displays: { titulo: 'Apagar displays', categoria: 'salidas', campos: [], ramas: [], entrada: true, siguiente: true, ayuda: 'Apaga los dos displays' },
+  brillo: { titulo: 'Brillo de los LEDs', categoria: 'salidas', campos: [expr('porcentaje', '%', '100')], ramas: [], entrada: true, siguiente: true, ayuda: 'Brillo de los 8 LEDs de 0 a 100 % (PWM)' },
+  lcd_limpiar: { titulo: 'Borrar LCD', categoria: 'lcd', campos: [], ramas: [], entrada: true, siguiente: true, ayuda: 'Deja el LCD en blanco' },
+  lcd_texto: {
+    titulo: 'Texto en el LCD',
+    categoria: 'lcd',
+    campos: [expr('fila', 'fila', '0'), expr('columna', 'columna', '0'), { nombre: 'texto', etiqueta: 'texto', tipo: 'texto', inicial: 'Hola' }],
+    ramas: [],
+    entrada: true,
+    siguiente: true,
+    ayuda: 'Fila 0 o 1, columna 0 a 15; hasta 16 letras sin tilde',
+  },
+  lcd_numero: {
+    titulo: 'Número en el LCD',
+    categoria: 'lcd',
+    campos: [expr('fila', 'fila', '0'), expr('columna', 'columna', '0'), expr('numero', 'número', 'pot()'), expr('ancho', 'ancho', '4')],
+    ramas: [],
+    entrada: true,
+    siguiente: true,
+    ayuda: 'Número alineado a la derecha en "ancho" columnas (1 a 6)',
+  },
+  lcd_luz: {
+    titulo: 'Luz del LCD',
+    categoria: 'lcd',
+    campos: [expr('estado', 'estado', 'encendido')],
+    ramas: [],
+    entrada: true,
+    siguiente: true,
+    ayuda: 'Luz de fondo del LCD: encendido/apagado o cualquier condición',
+  },
+  lcd_cursor: {
+    titulo: 'Cursor del LCD',
+    categoria: 'lcd',
+    campos: [expr('modo', 'modo', '0')],
+    ramas: [],
+    entrada: true,
+    siguiente: true,
+    ayuda: '0 sin cursor, 1 raya fija, 2 bloque que parpadea (queda después de lo último escrito)',
+  },
+  lcd_nube: {
+    titulo: 'Texto de la nube en el LCD',
+    categoria: 'nube',
+    campos: [expr('fila', 'fila', '0')],
+    ramas: [],
+    entrada: true,
+    siguiente: true,
+    ayuda: 'Fila 0 o 1: muestra lcd1 / lcd2 de Supabase (tablero Nube o Studio)',
+  },
+  nube_enviar: {
+    titulo: 'Enviar a la nube',
+    categoria: 'nube',
+    campos: [expr('n', 'canal', '1'), expr('valor', 'valor', 'pot()')],
+    ramas: [],
+    entrada: true,
+    siguiente: true,
+    ayuda: 'Valor que el ESP32 sube a la nube (canal 1 a 4). Para leer lo que llega usa nube(n) en cualquier campo',
+  },
   esperar: { titulo: 'Esperar', categoria: 'control', campos: [expr('ms', 'ms', '500')], ramas: [], entrada: true, siguiente: true, ayuda: 'Pausa en milisegundos (1000 = 1 s)' },
   si: {
     titulo: 'Si',
@@ -117,6 +182,14 @@ const INSTRUCCIONES: Partial<Record<TipoNodo, string[]>> = {
   led: ['n', 'estado'],
   esperar: ['ms'],
   apagar_displays: [],
+  brillo: ['porcentaje'],
+  lcd_limpiar: [],
+  lcd_texto: ['fila', 'columna', 'texto'],
+  lcd_numero: ['fila', 'columna', 'numero', 'ancho'],
+  lcd_luz: ['estado'],
+  lcd_cursor: ['modo'],
+  lcd_nube: ['fila'],
+  nube_enviar: ['n', 'valor'],
 }
 
 export interface Nodo {
@@ -179,6 +252,10 @@ export function grafoAPrograma(g: Grafo): Convertido {
   const visitados = new Set<string>()
 
   const campo = (n: Nodo, nombre: string): Expresion => {
+    // Campo de texto (lcd_texto): lo escrito es el texto, sin comillas
+    if (NODOS[n.tipo].campos.find((c) => c.nombre === nombre)?.tipo === 'texto') {
+      return { tipo: 'texto', valor: n.campos[nombre] ?? '' }
+    }
     try {
       return analizarExpresion(n.campos[nombre] ?? '')
     } catch (e) {
@@ -291,9 +368,14 @@ export function programaAGrafo(p: Programa): Grafo {
         return agregar('asignar', { variable: s.nombre, op: s.op, valor: formatearExpresion(s.valor) })
       case 'llamada': {
         const campos = INSTRUCCIONES[s.nombre as TipoNodo]
-        if (campos && campos.length === s.args.length) {
+        const esTexto = (c: string) => NODOS[s.nombre as TipoNodo].campos.find((d) => d.nombre === c)?.tipo === 'texto'
+        // un campo de texto solo admite un texto entre comillas; si no, va como "Instrucción"
+        if (campos && campos.length === s.args.length && campos.every((c, i) => !esTexto(c) || s.args[i].tipo === 'texto')) {
           const valores: Record<string, string> = {}
-          campos.forEach((c, i) => (valores[c] = formatearExpresion(s.args[i])))
+          campos.forEach((c, i) => {
+            const a = s.args[i]
+            valores[c] = esTexto(c) && a.tipo === 'texto' ? a.valor : formatearExpresion(a)
+          })
           return agregar(s.nombre as TipoNodo, valores)
         }
         return agregar('llamada', { nombre: s.nombre, args: s.args.map(formatearExpresion).join(', ') })

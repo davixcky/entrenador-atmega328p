@@ -1,23 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  ApagarDisplays,
-  BorrarGuardado,
-  CargarPrograma,
-  Conectar,
-  Desconectar,
-  DetenerPrograma,
-  ListarPuertos,
-  PonerLeds,
-  PonerNumero,
-} from '../wailsjs/go/main/App'
-import { main } from '../wailsjs/go/models'
-import { EventsOn } from '../wailsjs/runtime/runtime'
+import { backend, type EstadoConexion, type Puerto } from './backend'
 import { ejemplos, lineaColumna, PROG_MAX } from '@entrenador/lenguaje'
 import { useProyecto } from './proyecto'
+import { useAjustes, usaLcd } from './ajustes'
+import { Ajustes } from './componentes/Ajustes'
 import { Diagrama } from './componentes/Diagrama'
 import { EditorCodigo } from './componentes/EditorCodigo'
 import { Firmware } from './componentes/Firmware'
 import { Generado } from './componentes/Generado'
+import { Nube } from './componentes/Nube'
 import { Placa, Telemetria } from './componentes/Placa'
 
 const MAX_REGISTRO = 200
@@ -50,17 +41,21 @@ function generadoGuardado() {
 }
 
 export default function App() {
-  const [puertos, setPuertos] = useState<main.Puerto[]>([])
+  const [puertos, setPuertos] = useState<Puerto[]>([])
   const [puerto, setPuerto] = useState('')
-  const [conexion, setConexion] = useState<main.EstadoConexion>(new main.EstadoConexion({ conectado: false }))
+  const [conexion, setConexion] = useState<EstadoConexion>({ conectado: false })
   const [conectando, setConectando] = useState(false)
   const [telemetria, setTelemetria] = useState<Telemetria | null>(null)
   const [registro, setRegistro] = useState<string[]>([])
   const [aviso, setAviso] = useState<Aviso>(null)
   const [vista, setVista] = useState<Vista>(vistaGuardada)
   const [verFirmware, setVerFirmware] = useState(false)
+  // .../app/#nube abre directo el tablero (para mostrarlo en el celular)
+  const [verNube, setVerNube] = useState(() => window.location.hash === '#nube')
   const [verGenerado, setVerGenerado] = useState(generadoGuardado)
-  const proyecto = useProyecto()
+  const { ajustes, cambiar: cambiarAjustes } = useAjustes()
+  const [verAjustes, setVerAjustes] = useState(false)
+  const proyecto = useProyecto(ajustes)
   const { resultado } = proyecto
   const finRegistro = useRef<HTMLDivElement>(null)
 
@@ -80,7 +75,7 @@ export default function App() {
 
   const refrescarPuertos = useCallback(async () => {
     try {
-      const lista = await ListarPuertos()
+      const lista = await backend.listarPuertos()
       setPuertos(lista)
       setPuerto((actual) => {
         if (lista.some((p) => p.nombre === actual)) return actual
@@ -93,15 +88,14 @@ export default function App() {
 
   useEffect(() => {
     refrescarPuertos()
-    const quitar = [
-      EventsOn('telemetria', (t: Telemetria) => setTelemetria(t)),
-      EventsOn('registro', (linea: string) => anotar(linea)),
-      EventsOn('conexion', (e: main.EstadoConexion) => {
-        setConexion(new main.EstadoConexion(e))
+    return backend.escuchar({
+      telemetria: (t: Telemetria) => setTelemetria(t),
+      registro: (linea: string) => anotar(linea),
+      conexion: (e: EstadoConexion) => {
+        setConexion(e)
         if (!e.conectado) setTelemetria(null)
-      }),
-    ]
-    return () => quitar.forEach((q) => q())
+      },
+    })
   }, [refrescarPuertos, anotar])
 
   useEffect(() => {
@@ -113,7 +107,7 @@ export default function App() {
     setConectando(true)
     setAviso(null)
     try {
-      const estado = await Conectar(puerto)
+      const estado = await backend.conectar(puerto)
       setConexion(estado)
       if (estado.mensaje) setAviso({ tipo: 'error', texto: estado.mensaje })
     } catch (e) {
@@ -124,9 +118,17 @@ export default function App() {
   }
 
   const desconectar = async () => {
-    await Desconectar()
-    setConexion(new main.EstadoConexion({ conectado: false }))
+    await backend.desconectar()
+    setConexion({ conectado: false })
     setTelemetria(null)
+  }
+
+  // En el navegador hay que dar permiso a cada puerto la primera vez
+  const pedirPuerto = async () => {
+    const p = await backend.pedirPuerto?.()
+    if (!p) return
+    await refrescarPuertos()
+    setPuerto(p.nombre)
   }
 
   const elegirVista = (v: Vista) => {
@@ -169,7 +171,7 @@ export default function App() {
     const bytes = resultado.bytes
     if (!bytes) return
     try {
-      await CargarPrograma(bytes, guardar)
+      await backend.cargarPrograma(bytes, guardar)
       setAviso({
         tipo: 'ok',
         texto: guardar ? `Programa guardado en la placa (${bytes.length} bytes): corre al encender.` : `Programa en marcha (${bytes.length} bytes).`,
@@ -195,7 +197,7 @@ export default function App() {
     proyecto.cargarCodigo(ejemplo.codigo)
   }
 
-  const listo = conexion.conectado && conexion.entrenador
+  const listo = conexion.conectado && !!conexion.entrenador
 
   return (
     <div className="app">
@@ -218,9 +220,15 @@ export default function App() {
               </option>
             ))}
           </select>
-          <button type="button" className="boton-icono" onClick={refrescarPuertos} disabled={conexion.conectado} title="Buscar puertos" aria-label="Buscar puertos">
-            ⟳
-          </button>
+          {backend.pedirPuerto ? (
+            <button type="button" onClick={pedirPuerto} disabled={conexion.conectado} title="Dar permiso al navegador para un puerto USB">
+              Elegir puerto...
+            </button>
+          ) : (
+            <button type="button" className="boton-icono" onClick={refrescarPuertos} disabled={conexion.conectado} title="Buscar puertos" aria-label="Buscar puertos">
+              ⟳
+            </button>
+          )}
           {conexion.conectado ? (
             <button type="button" onClick={desconectar}>
               Desconectar
@@ -232,8 +240,14 @@ export default function App() {
           )}
           <span className={conexion.conectado ? 'chip chip-ok' : 'chip'}>Puente</span>
           <span className={listo ? 'chip chip-ok' : conexion.conectado ? 'chip chip-error' : 'chip'}>Entrenador</span>
+          <button type="button" onClick={() => setVerAjustes(true)} title="Luz y cursor del LCD, brillo de los LEDs: se agregan solos al programa">
+            Ajustes
+          </button>
           <button type="button" onClick={() => setVerFirmware(true)}>
             Firmware
+          </button>
+          <button type="button" onClick={() => setVerNube(true)} title="Tablero de la nube (Supabase): ADC y VALOR1">
+            Nube
           </button>
         </div>
       </header>
@@ -244,13 +258,13 @@ export default function App() {
             <button type="button" className="primario" onClick={() => ejecutar(false)} disabled={!listo || !resultado.bytes}>
               ▶ Ejecutar
             </button>
-            <button type="button" onClick={accion(DetenerPrograma)} disabled={!listo}>
+            <button type="button" onClick={accion(() => backend.detenerPrograma())} disabled={!listo}>
               ■ Detener
             </button>
             <button type="button" onClick={() => ejecutar(true)} disabled={!listo || !resultado.bytes} title="Guarda el programa en la EEPROM: corre al encender">
               Guardar en la placa
             </button>
-            <button type="button" onClick={accion(BorrarGuardado, 'Programa guardado borrado.')} disabled={!listo}>
+            <button type="button" onClick={accion(() => backend.borrarGuardado(), 'Programa guardado borrado.')} disabled={!listo}>
               Borrar de la placa
             </button>
             <span className="separador" />
@@ -341,8 +355,8 @@ export default function App() {
           <Placa
             t={telemetria}
             habilitado={listo}
-            onLeds={(v) => PonerLeds(v).catch(fallo)}
-            onNumero={(n) => (n === null ? ApagarDisplays() : PonerNumero(n)).catch(fallo)}
+            onLeds={(v) => backend.ponerLeds(v).catch(fallo)}
+            onNumero={(n) => (n === null ? backend.apagarDisplays() : backend.ponerNumero(n)).catch(fallo)}
           />
           <section className="panel registro" aria-label="Registro">
             <header className="panel-titulo">
@@ -352,7 +366,7 @@ export default function App() {
               </button>
             </header>
             <div className="registro-lineas mono">
-              {registro.length === 0 && <p className="nota">Conecta el Uno para empezar.</p>}
+              {registro.length === 0 && <p className="nota">Conecta el puente (ESP32 o Uno) para empezar.</p>}
               {registro.map((l, i) => (
                 <div key={i}>{l}</div>
               ))}
@@ -365,13 +379,26 @@ export default function App() {
       {verFirmware && (
         <Firmware
           puerto={puerto}
+          conexion={conexion}
           onCerrar={() => setVerFirmware(false)}
           onGrabado={() => {
-            setConexion(new main.EstadoConexion({ conectado: false }))
+            setConexion({ conectado: false })
             setTelemetria(null)
           }}
+          onRegistro={anotar}
         />
       )}
+      {verAjustes && (
+        <Ajustes
+          ajustes={ajustes}
+          usaLcd={!!resultado.programa && usaLcd(resultado.programa)}
+          puedeAplicar={listo && !!resultado.bytes}
+          onCambiar={cambiarAjustes}
+          onAplicar={() => ejecutar(false)}
+          onCerrar={() => setVerAjustes(false)}
+        />
+      )}
+      {verNube && <Nube conexion={conexion} onCerrar={() => setVerNube(false)} />}
     </div>
   )
 }

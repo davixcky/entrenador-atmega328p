@@ -12,7 +12,7 @@ import type { Expresion, OpAsignacion, OpBinario, Programa, Rango, Sentencia } f
 import { ErrorLenguaje } from './errores.ts'
 import { PALABRAS_CLAVE } from './funciones.ts'
 
-type TipoToken = 'numero' | 'nombre' | 'simbolo' | 'salto' | 'comentario' | 'fin'
+type TipoToken = 'numero' | 'nombre' | 'texto' | 'simbolo' | 'salto' | 'comentario' | 'fin'
 
 interface Token {
   tipo: TipoToken
@@ -68,6 +68,14 @@ export function tokenizar(texto: string): Token[] {
       tokens.push({ tipo: 'numero', texto: texto.slice(desde, i), desde, hasta: i, valor: parseInt(digitos, base), base })
       continue
     }
+    if (c === '"') {
+      i++
+      while (i < texto.length && texto[i] !== '"' && texto[i] !== '\n') i++
+      if (texto[i] !== '"') throw new ErrorLenguaje('Falta la comilla que cierra el texto', { rango: { desde, hasta: i } })
+      i++
+      tokens.push({ tipo: 'texto', texto: texto.slice(desde + 1, i - 1), desde, hasta: i })
+      continue
+    }
     if (LETRA.test(c)) {
       while (i < texto.length && LETRA_O_DIGITO.test(texto[i])) i++
       tokens.push({ tipo: 'nombre', texto: texto.slice(desde, i), desde, hasta: i })
@@ -92,6 +100,7 @@ function describir(t: Token) {
   if (t.tipo === 'fin') return 'el final'
   if (t.tipo === 'salto') return 'un salto de línea'
   if (t.tipo === 'comentario') return 'un comentario'
+  if (t.tipo === 'texto') return `el texto "${t.texto}"`
   return `"${t.texto}"`
 }
 
@@ -360,6 +369,10 @@ class Analizador {
         if (valor > 32767) valor -= 65536
       }
       return { tipo: 'numero', valor, base: t.base, rango: { desde: t.desde, hasta: t.hasta } }
+    }
+    if (t.tipo === 'texto') {
+      this.avanzar()
+      return { tipo: 'texto', valor: t.texto, rango: { desde: t.desde, hasta: t.hasta } }
     }
     if (t.tipo === 'nombre' && !PALABRAS.has(t.texto)) {
       this.avanzar()

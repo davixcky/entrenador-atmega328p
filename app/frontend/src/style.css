@@ -305,6 +305,122 @@ button.primario {
   box-shadow: 0 0 10px var(--led);
 }
 
+/* brillo() del programa: la luz se atenua con el porcentaje (PWM en la placa) */
+.leds .led.on .led-luz {
+  opacity: var(--brillo, 1);
+}
+
+/* ---- LCD 16x2 ---- */
+
+/* Ajustes: codigo que se agrega al programa */
+.ajustes-codigo {
+  margin: 4px 0 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--fondo-suave, rgb(127 127 127 / 12%));
+  font-size: 12.5px;
+  white-space: pre-wrap;
+}
+
+.campo.campo-fila {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Nube > Conexion: local o alojado */
+.selector-nube {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.selector-nube button[aria-pressed='true'] {
+  border-color: var(--acento, #4c9aff);
+  font-weight: 600;
+}
+
+/* Nube: LEDs del canal 2 */
+.nube-leds {
+  display: flex;
+  gap: 4px;
+}
+
+.nube-led {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 11px;
+}
+
+.nube-led-on {
+  background: #e5484d;
+  color: #fff;
+  border-color: #e5484d;
+}
+
+.lcd-bloque {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+
+.lcd-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  font-size: 12px;
+  color: var(--texto-suave);
+}
+
+.lcd-apagado {
+  filter: saturate(0.35) brightness(0.6);
+}
+
+/* lcd_luz(0): sin luz de fondo el texto casi no se ve, como en el LCD real */
+.lcd.lcd-sin-luz {
+  background: #0d1d33;
+}
+
+.lcd-sin-luz .lcd-celda {
+  color: #5d7290;
+  text-shadow: none;
+}
+
+.lcd {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  background: #1f4f8a;
+  border: 6px solid #10223a;
+  border-radius: 6px;
+  box-shadow: inset 0 0 12px rgb(0 0 0 / 45%);
+}
+
+.lcd-fila {
+  display: flex;
+  gap: 2px;
+}
+
+.lcd-celda {
+  display: inline-grid;
+  place-items: center;
+  width: 0.95em;
+  height: 1.35em;
+  background: rgb(255 255 255 / 6%);
+  color: #e8f1ff;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1;
+  text-shadow: 0 0 4px rgb(232 241 255 / 60%);
+}
+
 .led-nombre {
   font-family: var(--mono);
   font-size: 11px;
@@ -525,6 +641,141 @@ button.primario {
   font-size: 11px;
   color: var(--texto-suave);
   white-space: pre-wrap;
+}
+
+.modal-ancho {
+  width: min(760px, 100%);
+}
+
+.modal h3 {
+  margin: 18px 0 4px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--texto-suave);
+}
+
+.modal details {
+  margin-top: 12px;
+}
+
+.modal summary {
+  cursor: pointer;
+  color: var(--texto-suave);
+}
+
+.pasos li > button {
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.formulario {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px 12px;
+  margin: 10px 0 4px;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--texto-suave);
+}
+
+.campo input {
+  min-width: 0;
+  padding: 6px 8px;
+  background: var(--fondo);
+  color: var(--texto);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+}
+
+/* ---- Tablero de la nube ---- */
+
+.tablero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.tablero-dato {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.tablero-dato span,
+.tablero-dato small {
+  color: var(--texto-suave);
+  font-size: 12px;
+}
+
+.tablero-dato strong {
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.tablero-dato input[type='range'] {
+  width: 100%;
+  accent-color: var(--acento);
+}
+
+.grafica {
+  display: block;
+  width: 100%;
+  height: 160px;
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+}
+
+.grafica polyline {
+  fill: none;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.grafica-adc {
+  stroke: var(--acento);
+}
+
+.grafica-valor1 {
+  stroke: var(--ok);
+  stroke-dasharray: 4 3;
+}
+
+.grafica-rejilla {
+  stroke: var(--borde);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.grafica-vacia {
+  display: grid;
+  place-items: center;
+  height: 160px;
+  color: var(--texto-suave);
+  background: var(--fondo);
+  border: 1px dashed var(--borde);
+  border-radius: 6px;
+}
+
+.leyenda-adc {
+  color: var(--acento);
+}
+
+.leyenda-valor1 {
+  color: var(--ok);
 }
 
 /* ---- Editor: diagrama y codigo ---- */

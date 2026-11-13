@@ -25,6 +25,23 @@ diagrama de nodos o con código en español, verlo en vivo y grabarle el firmwar
 - **Firmware**: graba el puente en el Uno y el firmware `bloques` en el
   entrenador con avrdude.
 
+## Web y ESP32 (actividad 15.3)
+
+La misma interfaz corre en el navegador (Chrome o Edge, con Web Serial): `cd frontend &&
+npm run dev` y abrir `http://localhost:5173`. El backend se elige solo
+([`frontend/src/backend/`](frontend/src/backend/index.ts)): Go por wailsjs en el escritorio,
+Web Serial en el navegador. Con el **ESP32** como puente serie (solo TX/RX, en lugar del Uno)
+la app configura su Wi-Fi y muestra el tablero **Nube** (Supabase); el ATmega se sigue
+grabando con el Uno como ISP.
+
+**Ajustes** (barra superior): luz y cursor del LCD, brillo inicial de los LEDs e invertir el
+potenciómetro. La app
+agrega esas líneas sola al inicio del programa (las del LCD solo si el programa usa el
+LCD); se ven en *Generado*. El contraste del LCD es el potenciómetro azul del módulo I2C.
+En Ajustes también se **exporta/importa** la configuración (JSON con la conexión a la nube,
+los ajustes y el nombre de la red Wi-Fi; nunca la clave del Wi-Fi). En *Nube → Conexión* se
+elige Supabase local o el alojado (`VITE_SUPABASE_URL_ALOJADO` en `nube/.env.local`). Todo en [INTEGRADOR.md](../INTEGRADOR.md).
+
 ## Cómo funciona
 
 ```text

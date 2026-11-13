@@ -7,7 +7,7 @@ import { EditorState } from '@codemirror/state'
 import { EditorView, lineNumbers } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
 import { generarArduino, listado, type Programa } from '@entrenador/lenguaje'
-import { GuardarSketch, InstalarBiblioteca } from '../../wailsjs/go/main/App'
+import { backend } from '../backend'
 
 type Pestana = 'arduino' | 'bytecode'
 
@@ -137,7 +137,7 @@ export function Generado({ programa, bytes, variables, onAviso }: Props) {
 
   const guardar = async () => {
     try {
-      const ruta = await GuardarSketch('programa_entrenador', textos.arduino)
+      const ruta = await backend.guardarArchivo('programa_entrenador', textos.arduino)
       if (ruta) onAviso('ok', `Sketch guardado en ${ruta}. Para compilarlo hace falta la biblioteca Entrenador.`)
     } catch (e) {
       onAviso('error', String(e))
@@ -146,8 +146,13 @@ export function Generado({ programa, bytes, variables, onAviso }: Props) {
 
   const instalar = async () => {
     try {
-      const ruta = await InstalarBiblioteca()
-      onAviso('ok', `Biblioteca Entrenador instalada en ${ruta}. El IDE de Arduino ya puede compilar el sketch.`)
+      const ruta = await backend.instalarBiblioteca()
+      onAviso(
+        'ok',
+        backend.tipo === 'web'
+          ? `Biblioteca descargada: ${ruta}.`
+          : `Biblioteca Entrenador instalada en ${ruta}. El IDE de Arduino ya puede compilar el sketch.`,
+      )
     } catch (e) {
       onAviso('error', String(e))
     }
@@ -173,8 +178,13 @@ export function Generado({ programa, bytes, variables, onAviso }: Props) {
             <button type="button" className="boton-texto" onClick={guardar} disabled={!textos.arduino} title="Guarda el sketch para abrirlo en el IDE de Arduino">
               Guardar .ino
             </button>
-            <button type="button" className="boton-texto" onClick={instalar} title="Copia la biblioteca Entrenador en ~/Arduino/libraries">
-              Instalar biblioteca
+            <button
+              type="button"
+              className="boton-texto"
+              onClick={instalar}
+              title={backend.tipo === 'web' ? 'Descarga la biblioteca Entrenador como .zip para el IDE de Arduino' : 'Copia la biblioteca Entrenador en ~/Arduino/libraries'}
+            >
+              {backend.tipo === 'web' ? 'Descargar biblioteca' : 'Instalar biblioteca'}
             </button>
           </>
         )}

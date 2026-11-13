@@ -1,15 +1,26 @@
-"""Compara el netlist exportado por KiCad con las conexiones esperadas del generador."""
+"""Compara el netlist exportado por KiCad con las conexiones esperadas del generador.
+
+Uso: verificar_netlist.py ../out/net.xml  (kicadxml: incluye el ESP32 y el LCD)
+"""
 import sys
 from sexpr import parse, find, first
 import generar_esquematico as gen
 
 expected = gen.build().nets
-root = parse(open(sys.argv[1], encoding='utf-8').read())
 actual = {}
-for net in find(first(root, 'nets'), 'net'):
-    name = first(net, 'name')[1].lstrip('/')
-    for node in find(net, 'node'):
-        actual[(first(node, 'ref')[1], first(node, 'pin')[1])] = name
+if sys.argv[1].endswith('.xml'):
+    # kicadxml incluye los modulos externos (ESP32, LCD: "no va en la placa"), que el
+    # netlist kicadsexpr de la PCB deja fuera
+    import xml.etree.ElementTree as ET
+    for net in ET.parse(sys.argv[1]).getroot().iter('net'):
+        for node in net.iter('node'):
+            actual[(node.get('ref'), node.get('pin'))] = net.get('name').lstrip('/')
+else:
+    root = parse(open(sys.argv[1], encoding='utf-8').read())
+    for net in find(first(root, 'nets'), 'net'):
+        name = first(net, 'name')[1].lstrip('/')
+        for node in find(net, 'node'):
+            actual[(first(node, 'ref')[1], first(node, 'pin')[1])] = name
 
 errors = 0
 groups = {}

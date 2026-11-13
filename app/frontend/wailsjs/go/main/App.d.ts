@@ -8,6 +8,8 @@ export function BorrarGuardado():Promise<void>;
 
 export function CargarPrograma(arg1:Array<number>,arg2:boolean):Promise<void>;
 
+export function ComandoPuente(arg1:string,arg2:number):Promise<string>;
+
 export function Conectar(arg1:string):Promise<main.EstadoConexion>;
 
 export function Desconectar():Promise<void>;
@@ -25,6 +27,8 @@ export function GuardarSketch(arg1:string,arg2:string):Promise<string>;
 export function InstalarBiblioteca():Promise<string>;
 
 export function ListarPuertos():Promise<Array<main.Puerto>>;
+
+export function PausarTelemetria(arg1:boolean):Promise<void>;
 
 export function PonerLeds(arg1:number):Promise<void>;
 

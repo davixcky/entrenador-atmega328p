@@ -254,3 +254,74 @@ test('listado del bytecode', () => {
     ].join('\n'),
   )
 })
+
+test('lcd_texto lleva el texto dentro del bytecode', () => {
+  const bytes = compilarTexto('lcd_texto(1, 2, "Hola")')
+  assert.deepEqual(bytes, [OP.NUM, 1, 0, OP.NUM, 2, 0, OP.LCD_TEXTO, 4, 72, 111, 108, 97, OP.FIN])
+  assert.match(listado(bytes), /LCD_TEXTO\s+"Hola"/)
+  // el desensamblador salta los bytes del texto: la siguiente instruccion es FIN
+  assert.match(listado(bytes), /000C {2}00 +FIN/)
+})
+
+test('lcd, brillo y nube compilan en el orden de la maquina virtual', () => {
+  assert.deepEqual(compilarTexto('lcd_numero(0, 8, pot(), 4)'), [
+    OP.NUM, 0, 0, OP.NUM, 8, 0, OP.POT, OP.NUM, 4, 0, OP.LCD_NUMERO, OP.FIN,
+  ])
+  assert.deepEqual(compilarTexto('brillo(nube(1))'), [OP.NUM, 1, 0, OP.NUBE, OP.BRILLO, OP.FIN])
+  assert.deepEqual(compilarTexto('nube_enviar(2, 5)\nlcd_limpiar()'), [
+    OP.NUM, 2, 0, OP.NUM, 5, 0, OP.NUBE_ENVIAR, OP.LCD_LIMPIAR, OP.FIN,
+  ])
+})
+
+test('errores de los textos', () => {
+  assert.match(errorDe(() => compilarTexto('x = "hola"')).message, /solo puede ir en lcd_texto/)
+  assert.match(errorDe(() => compilarTexto('lcd_texto(0, 0, 5)')).message, /va entre comillas/)
+  assert.match(errorDe(() => compilarTexto('lcd_texto(0, 0, "12345678901234567")')).message, /caben 16/)
+  assert.match(errorDe(() => compilarTexto('lcd_texto(0, 0, "Año")')).message, /no puede mostrar "ñ"/)
+  const sinCerrar = errorDe(() => analizar('lcd_texto(0, 0, "hola)\n'))
+  assert.match(sinCerrar.message, /Falta la comilla/)
+  assert.deepEqual(sinCerrar.rango, { desde: 16, hasta: 22 })
+})
+
+test('el texto se conserva al formatear y en el sketch de Arduino', () => {
+  assert.equal(formatearExpresion(analizarExpresion('"ADC: "')), '"ADC: "')
+  const sketch = generarArduino(analizar('lcd_texto(0, 0, "ADC:")\nbrillo(50)'))
+  assert.match(sketch, /lcd_texto\(0, 0, "ADC:"\);/)
+  assert.match(sketch, /brillo\(50\);/)
+})
+
+test('el diagrama tiene nodos propios para el LCD, el brillo y la nube', () => {
+  const ejemplo = ejemplos.find((e) => e.nombre.startsWith('Integrador'))!
+  const grafo = programaAGrafo(analizar(ejemplo.codigo))
+  const tipos = grafo.nodos.map((n) => n.tipo)
+  for (const t of ['lcd_limpiar', 'lcd_texto', 'lcd_numero', 'brillo', 'nube_enviar']) assert.ok(tipos.includes(t as never), t)
+  assert.ok(!tipos.includes('llamada'))
+  // el texto del LCD va sin comillas en el nodo
+  assert.equal(grafo.nodos.find((n) => n.tipo === 'lcd_texto')!.campos.texto, 'ADC:')
+  // un texto que no es literal no cabe en el nodo: queda como "Instrucción"
+  const raro = programaAGrafo(analizar('lcd_texto(0, 0, x)'))
+  assert.ok(raro.nodos.some((n) => n.tipo === 'llamada'))
+})
+
+test('lcd_luz y lcd_cursor: bytecode, Arduino y diagrama', () => {
+  assert.deepEqual(compilarTexto('lcd_luz(apagado)\nlcd_cursor(2)'), [OP.NUM, 0, 0, OP.LCD_LUZ, OP.NUM, 2, 0, OP.LCD_CURSOR, OP.FIN])
+  const sketch = generarArduino(analizar('lcd_luz(encendido)\nlcd_cursor(1)'))
+  assert.match(sketch, /lcd_luz\(encendido\);/)
+  assert.match(sketch, /lcd_cursor\(1\);/)
+  const g = programaAGrafo(analizar('lcd_luz(interruptor(1))'))
+  assert.ok(g.nodos.some((n) => n.tipo === 'lcd_luz' && n.campos.estado === 'interruptor(1)'))
+})
+
+test('invertir_pot compila y pasa a Arduino', () => {
+  assert.deepEqual(compilarTexto('invertir_pot(encendido)'), [OP.NUM, 1, 0, OP.INVERTIR_POT, OP.FIN])
+  assert.match(generarArduino(analizar('invertir_pot(encendido)')), /invertir_pot\(encendido\);/)
+})
+
+test('lcd_nube: bytecode, Arduino y nodo del diagrama', () => {
+  assert.deepEqual(compilarTexto('lcd_nube(1)'), [OP.NUM, 1, 0, OP.LCD_NUBE, OP.FIN])
+  assert.match(generarArduino(analizar('lcd_nube(0)')), /lcd_nube\(0\);/)
+  const ejemplo = ejemplos.find((e) => e.nombre === 'Control desde la nube')!
+  const tipos = programaAGrafo(analizar(ejemplo.codigo)).nodos.map((n) => n.tipo)
+  assert.ok(tipos.includes('lcd_nube'))
+  assert.ok(!tipos.includes('llamada'))
+})

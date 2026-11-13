@@ -28,10 +28,20 @@ enum : uint8_t {
   OP_LEDS,                 // desapila valor binario de los 8 LEDs
   OP_NUMERO,               // desapila el numero de los displays
   OP_APAGAR_DISPLAYS,
+  OP_BRILLO,               // desapila porcentaje 0..100 de los LEDs
+  OP_LCD_LIMPIAR,
+  OP_LCD_TEXTO,            // + u8 largo + bytes ASCII; desapila columna y fila
+  OP_LCD_NUMERO,           // desapila ancho, numero, columna y fila
+  OP_NUBE_ENVIAR,          // desapila valor y n (1..4)
+  OP_LCD_LUZ,              // desapila estado (0 apagada)
+  OP_LCD_CURSOR,           // desapila modo 0..2
+  OP_INVERTIR_POT,         // desapila estado (0 normal)
+  OP_LCD_NUBE,             // desapila fila: texto de la nube en esa fila del LCD
   OP_POT = 0x40,           // apila el potenciometro 0..1023
   OP_DIP,                  // apila el DIP 0..15
   OP_INTERRUPTOR,          // desapila 1..4, apila 0/1
   OP_ALEATORIO,            // desapila max y min, apila min..max
+  OP_NUBE,                 // desapila n (1..4), apila el valor recibido del ESP32
 };
 
 enum : uint8_t {
@@ -52,6 +62,16 @@ int16_t hwPot();
 int16_t hwDip();
 int16_t hwAleatorio(int16_t min, int16_t max);  // min..max incluidos
 unsigned long hwMillis();
+void hwBrillo(int16_t porcentaje);
+void hwLcdLimpiar();
+void hwLcdTexto(int16_t fila, int16_t columna, const char *texto);
+void hwLcdNumero(int16_t fila, int16_t columna, int16_t numero, int16_t ancho);
+void hwNubeEnviar(int16_t n, int16_t valor);
+void hwLcdLuz(int16_t estado);
+void hwLcdCursor(int16_t modo);
+void hwInvertirPot(int16_t estado);
+void hwLcdNube(int16_t fila);
+int16_t hwNube(int16_t n);
 
 const uint16_t PROG_MAX = 768;
 const uint8_t PILA_MAX = 32;
@@ -179,6 +199,32 @@ bool maquinaPaso(uint8_t maxInstrucciones) {
       case OP_LEDS: hwLeds((uint8_t)desapilar()); break;
       case OP_NUMERO: hwNumero(desapilar()); break;
       case OP_APAGAR_DISPLAYS: hwApagarDisplays(); break;
+      case OP_BRILLO: hwBrillo(desapilar()); break;
+      case OP_LCD_LIMPIAR: hwLcdLimpiar(); break;
+      case OP_LCD_TEXTO: {
+        if (!hay(1)) break;
+        uint8_t largo = leer8();
+        if (!hay(largo)) break;
+        char texto[17];                      // el LCD tiene 16 columnas
+        uint8_t n = largo < 16 ? largo : 16;
+        for (uint8_t i = 0; i < n; i++) texto[i] = (char)prog[pc + i];
+        texto[n] = '\0';
+        pc += largo;
+        b = desapilar(); a = desapilar();
+        hwLcdTexto(a, b, texto);
+        break;
+      }
+      case OP_LCD_NUMERO: {
+        int16_t ancho = desapilar(), numero = desapilar();
+        b = desapilar(); a = desapilar();
+        hwLcdNumero(a, b, numero, ancho);
+        break;
+      }
+      case OP_NUBE_ENVIAR: b = desapilar(); a = desapilar(); hwNubeEnviar(a, b); break;
+      case OP_LCD_LUZ: hwLcdLuz(desapilar()); break;
+      case OP_LCD_CURSOR: hwLcdCursor(desapilar()); break;
+      case OP_INVERTIR_POT: hwInvertirPot(desapilar()); break;
+      case OP_LCD_NUBE: hwLcdNube(desapilar()); break;
 
       case OP_POT: apilar(hwPot()); break;
       case OP_DIP: apilar(hwDip()); break;
@@ -190,6 +236,7 @@ bool maquinaPaso(uint8_t maxInstrucciones) {
         b = desapilar(); a = desapilar();
         apilar(a <= b ? hwAleatorio(a, b) : hwAleatorio(b, a));
         break;
+      case OP_NUBE: apilar(hwNube(desapilar())); break;
 
       default: fallar(ERR_OPERACION); break;
     }

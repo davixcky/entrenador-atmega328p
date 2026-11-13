@@ -13,6 +13,8 @@ export type OpAsignacion = '=' | '+=' | '-='
 
 export type Expresion =
   | { tipo: 'numero'; valor: number; base?: 2 | 10 | 16; rango?: Rango }
+  // Texto entre comillas: solo como argumento de las funciones que lo piden (lcd_texto)
+  | { tipo: 'texto'; valor: string; rango?: Rango }
   | { tipo: 'variable'; nombre: string; rango?: Rango }
   | { tipo: 'binaria'; op: OpBinario; a: Expresion; b: Expresion; rango?: Rango }
   | { tipo: 'unaria'; op: OpUnario; a: Expresion; rango?: Rango }

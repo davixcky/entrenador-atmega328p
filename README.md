@@ -19,6 +19,8 @@ Proyecto de **Sistemas Embebidos 1 — Actividad 10.1.12**. Entrenador con ATmeg
 | [Proyecto KiCad](kicad/entrenador-atmega328p.kicad_pro) · [Fabricación](kicad/fabricacion/) | Diseño de PCB y archivos de fabricación |
 | [Presentación PDF](presentacion/presentacion-final.pdf) · [PowerPoint](presentacion/presentacion-final.pptx) · [Guion](presentacion/guion.pdf) | Exposición del proyecto |
 | [Sitio web](web/README.md) | Fuente del sitio (Astro), publicado en GitHub Pages |
+| [Circuito integrador (15.3)](INTEGRADOR.md) · [Esquemático](kicad/esquematico.pdf) | Entrenador + ESP32 por serie, nube propia (Supabase), LCD por I2C y app web |
+| [Puente ESP32](firmware/esp32-puente/README.md) · [Nube](nube/README.md) | Firmware ESP-IDF del ESP32 y backend Supabase (local y alojado) |
 
 ## Cómo se usa
 
