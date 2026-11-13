@@ -6,10 +6,10 @@
 	(paper "A2")
 	(title_block
 		(title "Entrenador de microcontroladores ATmega328P (DIP)")
-		(date "2026-11-12")
-		(rev "4")
+		(date "2026-11-13")
+		(rev "5")
 		(company "Universidad de la Costa (CUC) — Sistemas Embebidos 1")
-		(comment 1 "David Orozco · Jose Torres · Leo Rojas")
+		(comment 1 "David Orozco · Jose Torres · Leo Rojas · Freider Maldonado")
 		(comment 2 "Actividades 10.1.12 y 15.3 (ESP32, LCD I2C)")
 	)
 	(lib_symbols

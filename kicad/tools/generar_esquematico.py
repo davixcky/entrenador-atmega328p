@@ -303,7 +303,7 @@ class Sheet:
                 [S('title'), titulo[0]],
                 [S('date'), titulo[1]], [S('rev'), titulo[2]],
                 [S('company'), 'Universidad de la Costa (CUC) — Sistemas Embebidos 1'],
-                [S('comment'), 1, 'David Orozco · Jose Torres · Leo Rojas'],
+                [S('comment'), 1, 'David Orozco · Jose Torres · Leo Rojas · Freider Maldonado'],
                 [S('comment'), 2, titulo[3]]],
                [S('lib_symbols')] + list(self.lib.values())] + body + self.items + [
             [S('sheet_instances'), [S('path'), '/', [S('page'), '1']]],
@@ -716,7 +716,7 @@ def build():
             '    LCD I2C va a los pines 27-28 (DIP4 abierto). U5, U6, R20 y R21 se cablean aparte (no van en la PCB).',
             17.78, 252.73, size=1.4)
 
-    sh.save(OUT, titulo=('Entrenador de microcontroladores ATmega328P (DIP)', '2026-11-12', '4',
+    sh.save(OUT, titulo=('Entrenador de microcontroladores ATmega328P (DIP)', '2026-11-13', '5',
                          'Actividades 10.1.12 y 15.3 (ESP32, LCD I2C)'), papel='A2')
     guardar_biblioteca(os.path.dirname(OUT))
     return sh

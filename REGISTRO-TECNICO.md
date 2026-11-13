@@ -41,7 +41,7 @@
 - Proyecto KiCad 10: [`kicad/entrenador-atmega328p.kicad_pro`](kicad/entrenador-atmega328p.kicad_pro).
 - El esquemático se genera con [`kicad/tools/generar_esquematico.py`](kicad/tools/generar_esquematico.py) y se verifica con:
   - `kicad-cli sch erc` → **0 errores, 0 advertencias** ([`kicad/erc.rpt`](kicad/erc.rpt)).
-  - [`kicad/tools/verificar_netlist.py`](kicad/tools/verificar_netlist.py) → compara el netlist exportado por KiCad con las conexiones esperadas: **195 pines, 49 redes, 0 errores**.
+  - [`kicad/tools/verificar_netlist.py`](kicad/tools/verificar_netlist.py) → compara el netlist exportado por KiCad con las conexiones esperadas: **181 pines, 45 redes, 0 errores**.
 - Dentro de cada bloque (fuente, reloj, reset, programación) los componentes van unidos con cables en el orden en que pasa la señal; por ejemplo, la fuente se lee de izquierda a derecha: J1 → D1 → C1/C2 → 7805 → C3/C4 → LED de encendido. Entre bloques se usan etiquetas: las que tienen el mismo nombre (por ejemplo `SEG_A`, `BUS3`, `RESET`) están unidas. Los puntos de unión se calculan solos al generar el archivo.
 - Las notas numeradas de la hoja resumen alimentación, programación (fusibles), multiplexado, entradas y el cableado del DIP para la PCB.
 - Para montar en protoboard se usa [`kicad/CONEXIONES.md`](kicad/CONEXIONES.md): una tabla por red con cada pin que hay que unir.

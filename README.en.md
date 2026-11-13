@@ -4,6 +4,8 @@
 
 Project for **Embedded Systems 1 — Activity 10.1.12** at Universidad de la Costa (CUC). A trainer board with an ATmega328P at 16 MHz, a potentiometer, a DIP switch, 8 LEDs and two 7-segment displays, programmed from a desktop app with a node diagram or with code in a small Spanish language.
 
+**Team:** David Orozco, Jose Torres, Leo Rojas and Freider Maldonado.
+
 **Status:** hardware built and working. Firmware, app, Arduino library, KiCad design and presentation are in this repository. Most documents are in Spanish; the user guide and the language reference have English versions.
 
 ## Documentation

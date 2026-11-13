@@ -4,6 +4,8 @@
 
 Proyecto de **Sistemas Embebidos 1 — Actividad 10.1.12**. Entrenador con ATmega328P a 16 MHz, potenciómetro, DIP switch, 8 LEDs y 2 displays de 7 segmentos, que se programa desde una app de escritorio con un diagrama de nodos o con código en español.
 
+**Equipo:** David Orozco, Jose Torres, Leo Rojas y Freider Maldonado.
+
 **Estado:** hardware armado y funcionando. Firmware, app, biblioteca de Arduino, diseño KiCad y presentación en este repositorio.
 
 ## Documentación

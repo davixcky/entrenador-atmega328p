@@ -34,7 +34,7 @@ necesitan ISP.
 ## Conexiones ESP32 ↔ entrenador
 
 Esquemático: bloque **ESP32 Y LCD I2C** del esquemático del entrenador
-([`kicad/esquematico.pdf`](kicad/esquematico.pdf), hoja A2, revisión 4; ERC sin errores). El LCD
+([`kicad/esquematico.pdf`](kicad/esquematico.pdf), hoja A2, revisión 5; ERC sin errores). El LCD
 va al ATmega (pines 27 y 28). U5 (ESP32),
 U6 (LCD), R20 y R21 se cablean aparte: están marcados "no va en la placa" y la PCB de
 `kicad/` no cambia.

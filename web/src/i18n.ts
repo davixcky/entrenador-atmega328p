@@ -27,7 +27,7 @@ export const T = {
     soloEspanol: '',
     contenido: 'En esta página',
     verEnGithub: 'Ver en GitHub',
-    pie: 'Sistemas Embebidos 1 · Universidad de la Costa (CUC) · David Orozco, Jose Torres, Leo Rojas',
+    pie: 'Sistemas Embebidos 1 · Universidad de la Costa (CUC) · David Orozco, Jose Torres, Leo Rojas, Freider Maldonado',
     inicio: {
       etiqueta: 'Sistemas Embebidos 1 · Actividad 10.1.12',
       lema: 'Un entrenador de microcontroladores hecho a mano, que se programa con un diagrama de nodos o con código en español, y se ve en vivo desde el PC.',
@@ -37,7 +37,7 @@ export const T = {
       piezas: [
         ['ATmega328P a 16 MHz', 'En zócalo DIP-28, con cristal, reset y fuente propia de 9–12 V a 5 V.'],
         ['8 LEDs y 2 displays', 'Un bus de 8 bits compartido, multiplexado cada 2 ms con tres transistores.'],
-        ['Entradas', 'Potenciómetro, DIP switch de 4 posiciones y cinco botones en escalera en una sola entrada analógica.'],
+        ['Entradas', 'Potenciómetro, DIP switch de 4 posiciones y LCD 16x2 por I2C; con el ESP32 se controla desde la nube.'],
         ['Solo un Arduino Uno', 'El mismo Uno graba el firmware por ISP y hace de puente serie con la app, sin recablear.'],
       ],
       app: 'La app',
@@ -72,7 +72,7 @@ export const T = {
         ['Reloj y reset', 'Cristal de 16 MHz con capacitores de 22 pF; pull-up de 10 kΩ, pulsador, filtro y diodo de protección en RESET.'],
         ['Programación y serie', 'J3 (ICSP) para grabar con el Arduino Uno; J2 para el serie de la app.'],
         ['Salidas', 'Bus de 8 bits con resistencias de 220 Ω hacia 8 LEDs y dos displays de cátodo común; Q1–Q3 eligen el grupo.'],
-        ['Entradas', 'Potenciómetro en A0, DIP en PC1–PC4 con pull-up interna y botones B1–B5 en escalera en A5.'],
+        ['Entradas', 'Potenciómetro en A0, DIP en PC1–PC4 con pull-up interna y LCD I2C en PC4 (SDA) y PC5 (SCL).'],
       ],
       nota: 'Al armarla: AVCC (pin 20) a +5V es obligatorio para el ADC, y el cursor del potenciómetro va al pin 23.',
     },
@@ -85,7 +85,7 @@ export const T = {
     soloEspanol: 'This page is only available in Spanish.',
     contenido: 'On this page',
     verEnGithub: 'View on GitHub',
-    pie: 'Embedded Systems 1 · Universidad de la Costa (CUC) · David Orozco, Jose Torres, Leo Rojas',
+    pie: 'Embedded Systems 1 · Universidad de la Costa (CUC) · David Orozco, Jose Torres, Leo Rojas, Freider Maldonado',
     inicio: {
       etiqueta: 'Embedded Systems 1 · Activity 10.1.12',
       lema: 'A hand-built microcontroller trainer, programmed with a node diagram or with code in Spanish, and watched live from the PC.',
@@ -95,7 +95,7 @@ export const T = {
       piezas: [
         ['ATmega328P at 16 MHz', 'In a DIP-28 socket, with crystal, reset and its own 9–12 V to 5 V supply.'],
         ['8 LEDs and 2 displays', 'One shared 8-bit bus, multiplexed every 2 ms by three transistors.'],
-        ['Inputs', 'A potentiometer, a 4-way DIP switch and five buttons on a resistor ladder, on a single analog input.'],
+        ['Inputs', 'A potentiometer, a 4-way DIP switch and a 16x2 I2C LCD; with the ESP32 it is controlled from the cloud.'],
         ['Just an Arduino Uno', 'The same Uno flashes the firmware over ISP and bridges the app’s serial link, with no rewiring.'],
       ],
       app: 'The app',
@@ -130,7 +130,7 @@ export const T = {
         ['Clock and reset', '16 MHz crystal with 22 pF capacitors; 10 kΩ pull-up, push button, filter and clamp diode on RESET.'],
         ['Programming and serial', 'J3 (ICSP) to flash with the Arduino Uno; J2 for the app’s serial link.'],
         ['Outputs (Salidas)', '8-bit bus with 220 Ω resistors to 8 LEDs and two common-cathode displays; Q1–Q3 select the group.'],
-        ['Inputs (Entradas)', 'Potentiometer on A0, DIP switch on PC1–PC4 with internal pull-ups, and buttons B1–B5 on a ladder on A5.'],
+        ['Inputs (Entradas)', 'Potentiometer on A0, DIP switch on PC1–PC4 with internal pull-ups, and the I2C LCD on PC4 (SDA) and PC5 (SCL).'],
       ],
       nota: 'When building it: AVCC (pin 20) must go to +5V for the ADC to work, and the potentiometer’s wiper goes to pin 23.',
     },
