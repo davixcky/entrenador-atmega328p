@@ -57,6 +57,48 @@ LCD I2C (PCF8574, dirección 0x20–0x27 o 0x38–0x3F, se detecta sola): SDA �
 El pin 28 (PC5) no tiene nada más conectado en la placa armada. **DIP4 (pin 27 = SDA) debe
 quedar abierto**: cerrado pone SDA a GND y el LCD no responde.
 
+## Texto largo y programas por Wi-Fi
+
+En **Nube**, cada fila admite hasta **160 caracteres ASCII**. Los textos de hasta
+16 caracteres quedan quietos; los más largos se desplazan una columna cada 400 ms,
+con una pausa de 1,2 s al empezar y tres espacios entre vueltas. El ESP32 hace el
+scroll, incluso con el navegador cerrado, y sigue usando el comando `M` de 16 columnas:
+no hace falta volver a grabar el ATmega. El programa debe llamar `lcd_nube(0)` y/o
+`lcd_nube(1)` periódicamente (como **Control desde la nube**).
+
+**Ejecutar por Wi-Fi** envía el programa del editor a la conexión elegida en **Nube**.
+No requiere USB: el ESP32 reclama la carga, envía `B`, bloques `D`, `E` y finalmente
+`R` al entrenador. La app muestra la espera, la carga y la confirmación real del
+entrenador. Esta acción ejecuta en RAM; no cambia el programa guardado en EEPROM.
+
+Solo se permite una carga activa por dispositivo. Una carga sin recoger expira a
+los 60 s; una carga reclamada sin confirmación expira a los 90 s. El ESP32 no repite
+la ejecución después de un reinicio o de perder una respuesta HTTP. Si se pierde
+la confirmación del comando `R`, el programa puede estar corriendo aunque la app
+muestre un error: comprobar la placa antes de volver a enviarlo.
+
+### Actualización desde la versión de 16 caracteres
+
+1. Compilar `firmware/esp32-puente/compilar.sh` y actualizar **solo la aplicación**
+   del ESP32 para conservar Wi-Fi y Supabase en NVS:
+   `esptool.py --chip esp32 -p /dev/ttyUSB0 write_flash 0x10000 firmware/esp32-puente/dist/esp32-puente.bin`.
+   Desconectar antes la app del puerto. La imagen combinada en dirección 0 también
+   incluye el espacio de NVS: reservarla para una instalación nueva.
+2. Aplicar las migraciones `20261114000000_lcd_desplazamiento.sql` y
+   `20261114010000_programar_wifi.sql` de `nube/supabase/migrations/`.
+   Conservan textos, controles y permisos existentes. Las cargas usan la misma
+   política de demostración pública que los controles del proyecto.
+3. Publicar la app nueva. El firmware nuevo tolera que aún no exista la API de cargas;
+   el ATmega y la app USB existentes siguen funcionando.
+
+Para volver atrás, publicar la app anterior y restaurar la aplicación ESP32 anterior
+(solo `0x10000`). Conservar las ampliaciones de la base evita perder datos; la versión
+anterior del ESP32 solo muestra los primeros 16 caracteres. Antes de restaurar el límite
+SQL de 16, exportar y revisar los mensajes que lo excedan; no truncarlos automáticamente.
+
+Pruebas: `firmware/esp32-puente/pruebas/correr.sh`, `(cd app/frontend && npm test && npm run build)`
+y `nube/pruebas/programar-wifi.sql` en una base de prueba con las migraciones aplicadas.
+
 ## Protocolo serie del entrenador (firmware/bloques, versión 2)
 
 Por líneas, 19200 baudios, una respuesta por comando. Igual que la versión 1 más:

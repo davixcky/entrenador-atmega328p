@@ -12,6 +12,7 @@ import {
   fijarTexto,
   leerTextos,
   textoLcd,
+  MAX_TEXTO_LCD,
   guardarConfig,
   leerEntradas,
   ultimasLecturas,
@@ -210,10 +211,11 @@ export function Nube({ conexion, onCerrar }: Props) {
         <div className="formulario">
           {[0, 1].map((f) => (
             <label key={f} className="campo">
-              <span>LCD fila {f} (lcd{f + 1}, hasta 16 letras sin tilde)</span>
-              <input
+              <span>LCD fila {f} · {textos[f].length}/{MAX_TEXTO_LCD}</span>
+              <textarea
                 className="mono"
-                maxLength={16}
+                rows={3}
+                maxLength={MAX_TEXTO_LCD}
                 value={textos[f]}
                 onChange={(e) => {
                   const t = textoLcd(e.target.value)
@@ -224,6 +226,7 @@ export function Nube({ conexion, onCerrar }: Props) {
             </label>
           ))}
         </div>
+        <p className="nota">Los mensajes de más de 16 caracteres se desplazan automáticamente. Las tildes se convierten a letras simples.</p>
         <button type="button" className="primario" onClick={enviarTextos}>
           Enviar texto al LCD
         </button>

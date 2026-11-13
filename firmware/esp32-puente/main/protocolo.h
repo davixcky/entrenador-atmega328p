@@ -59,6 +59,32 @@ void bytes_a_hex(const uint8_t *src, size_t n, char *dst);
 
 // ---- Nube (Supabase) ----
 
+#define LCD_TEXTO_MAX 160
+#define LCD_COLUMNAS 16
+#define LCD_PASO_MS 400
+typedef struct {
+  char texto[LCD_TEXTO_MAX + 1];
+  uint32_t inicio_ms;
+} mensaje_lcd_t;
+
+// Releer el mismo mensaje no reinicia su desplazamiento.
+void lcd_actualizar(mensaje_lcd_t *m, const char *texto, uint32_t ahora_ms);
+// Siempre 16 caracteres y terminador. Los mensajes cortos quedan quietos.
+void lcd_ventana(const mensaje_lcd_t *m, uint32_t ahora_ms, char salida[LCD_COLUMNAS + 1]);
+
+#define PROGRAMA_MAX 768
+typedef struct {
+  char id[37];
+  uint8_t bytes[PROGRAMA_MAX];
+  size_t largo;
+} programa_wifi_t;
+// Respuesta de reclamar_programa: 0 sin carga, 1 carga valida, -1 invalida.
+int parsear_programa_json(const char *json, programa_wifi_t *programa);
+typedef bool (*intercambio_programa_t)(const char *cmd, char *resp, size_t cap, void *ctx);
+// B, D, E y R: solo ejecuta despues de que el entrenador confirme todo el bytecode.
+bool enviar_programa_wifi(const programa_wifi_t *p, intercambio_programa_t intercambio,
+                         void *ctx, char *detalle, size_t cap);
+
 // Respuesta del GET de controles: [{"entradas":[v1,v2,v3,v4]}] o [] (sin fila = ceros).
 // Faltantes o null valen 0. Falso si no es un arreglo JSON.
 bool parsear_entradas_json(const char *cuerpo, int16_t e[4]);

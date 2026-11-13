@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { backend, type EstadoConexion, type Puerto } from './backend'
+import { configGuardada, ejecutarPorWifi } from './backend/nube'
 import { ejemplos, lineaColumna, PROG_MAX } from '@entrenador/lenguaje'
 import { useProyecto } from './proyecto'
 import { useAjustes, usaLcd } from './ajustes'
@@ -45,6 +46,7 @@ export default function App() {
   const [puerto, setPuerto] = useState('')
   const [conexion, setConexion] = useState<EstadoConexion>({ conectado: false })
   const [conectando, setConectando] = useState(false)
+  const [envioWifi, setEnvioWifi] = useState<string | null>(null)
   const [telemetria, setTelemetria] = useState<Telemetria | null>(null)
   const [registro, setRegistro] = useState<string[]>([])
   const [aviso, setAviso] = useState<Aviso>(null)
@@ -169,7 +171,7 @@ export default function App() {
 
   const ejecutar = async (guardar: boolean) => {
     const bytes = resultado.bytes
-    if (!bytes) return
+    if (!bytes || envioWifi) return
     try {
       await backend.cargarPrograma(bytes, guardar)
       setAviso({
@@ -187,6 +189,23 @@ export default function App() {
       if (ok) setAviso({ tipo: 'ok', texto: ok })
     } catch (e) {
       fallo(e)
+    }
+  }
+
+  const ejecutarWifi = async () => {
+    if (!resultado.bytes || envioWifi) return
+    const bytes = [...resultado.bytes]
+    setEnvioWifi('Enviando por Wi-Fi…')
+    setAviso(null)
+    try {
+      await ejecutarPorWifi(configGuardada(), bytes, (estado) => { setEnvioWifi(estado); anotar(estado) })
+      const texto = `Programa en marcha por Wi-Fi (${bytes.length} bytes).`
+      setAviso({ tipo: 'ok', texto })
+      anotar(texto)
+    } catch (e) {
+      fallo(e)
+    } finally {
+      setEnvioWifi(null)
     }
   }
 
@@ -255,16 +274,19 @@ export default function App() {
       <main className="cuerpo">
         <section className="area-programa">
           <div className="barra-programa">
-            <button type="button" className="primario" onClick={() => ejecutar(false)} disabled={!listo || !resultado.bytes}>
+            <button type="button" className="primario" onClick={() => ejecutar(false)} disabled={!listo || !resultado.bytes || !!envioWifi}>
               ▶ Ejecutar
             </button>
-            <button type="button" onClick={accion(() => backend.detenerPrograma())} disabled={!listo}>
+            <button type="button" onClick={ejecutarWifi} disabled={!resultado.bytes || !!envioWifi} title="Envía y ejecuta el programa usando la conexión de Nube, sin USB">
+              {envioWifi ? 'Enviando por Wi-Fi…' : '▶ Ejecutar por Wi-Fi'}
+            </button>
+            <button type="button" onClick={accion(() => backend.detenerPrograma())} disabled={!listo || !!envioWifi}>
               ■ Detener
             </button>
-            <button type="button" onClick={() => ejecutar(true)} disabled={!listo || !resultado.bytes} title="Guarda el programa en la EEPROM: corre al encender">
+            <button type="button" onClick={() => ejecutar(true)} disabled={!listo || !resultado.bytes || !!envioWifi} title="Guarda el programa en la EEPROM: corre al encender">
               Guardar en la placa
             </button>
-            <button type="button" onClick={accion(() => backend.borrarGuardado(), 'Programa guardado borrado.')} disabled={!listo}>
+            <button type="button" onClick={accion(() => backend.borrarGuardado(), 'Programa guardado borrado.')} disabled={!listo || !!envioWifi}>
               Borrar de la placa
             </button>
             <span className="separador" />
@@ -310,6 +332,7 @@ export default function App() {
               <span>{textoError}</span>
             </div>
           )}
+          {envioWifi && <p className="aviso" role="status">{envioWifi}</p>}
           {aviso && (
             <div className={aviso.tipo === 'ok' ? 'aviso aviso-ok' : 'aviso aviso-error'} role="status">
               <span>{aviso.texto}</span>

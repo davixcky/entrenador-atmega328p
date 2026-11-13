@@ -42,6 +42,14 @@ En Ajustes también se **exporta/importa** la configuración (JSON con la conexi
 los ajustes y el nombre de la red Wi-Fi; nunca la clave del Wi-Fi). En *Nube → Conexión* se
 elige Supabase local o el alojado (`VITE_SUPABASE_URL_ALOJADO` en `nube/.env.local`). Todo en [INTEGRADOR.md](../INTEGRADOR.md).
 
+## Desde el navegador
+
+La versión web permite **Ejecutar por Wi-Fi** con la conexión configurada en **Nube**:
+no hace falta conectar el USB. El ESP32 confirma la carga y el arranque del programa;
+esta acción no modifica la EEPROM. Los mensajes del LCD admiten 160 caracteres por
+fila y se desplazan automáticamente si no caben en 16 columnas. Requiere el firmware
+ESP32 y las migraciones descritas en [INTEGRADOR.md](../INTEGRADOR.md).
+
 ## Cómo funciona
 
 ```text

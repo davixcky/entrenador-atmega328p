@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "esp_err.h"
+#include "protocolo.h"
 
 // ---- Pines (ver INTEGRADOR.md, "Conexiones ESP32 <-> entrenador") ----
 
@@ -50,6 +51,8 @@ void entrenador_iniciar(void);
 // Envia cmd y espera la linea OK/T/ERR (las lineas intermedias van al anfitrion).
 // Falso si no llego en 1 s. Toma el mutex del entrenador: no llamar con el tomado.
 bool entrenador_transaccion(const char *cmd, char *respuesta, size_t cap);
+// Reserva el serie durante toda la carga: ni telemetria ni LCD intercalan comandos.
+bool entrenador_programa(const programa_wifi_t *p, char *detalle, size_t cap);
 void entrenador_vaciar(void);  // linea vacia al entrenador, respuesta descartada
 
 // ---- ISP por bit-bang (J3) ----

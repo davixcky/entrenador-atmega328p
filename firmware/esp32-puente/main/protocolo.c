@@ -119,6 +119,26 @@ void bytes_a_hex(const uint8_t *src, size_t n, char *dst) {
 
 // ---- Nube ----
 
+void lcd_actualizar(mensaje_lcd_t *m, const char *texto, uint32_t ahora_ms) {
+  if (strncmp(m->texto, texto, LCD_TEXTO_MAX) == 0) return;
+  snprintf(m->texto, sizeof m->texto, "%.*s", LCD_TEXTO_MAX, texto);
+  m->inicio_ms = ahora_ms;
+}
+
+void lcd_ventana(const mensaje_lcd_t *m, uint32_t ahora_ms, char salida[LCD_COLUMNAS + 1]) {
+  size_t largo = strlen(m->texto), pos = 0;
+  if (largo > LCD_COLUMNAS) {
+    // Tres espacios entre vueltas; pausa de 1.2 s al principio de cada vuelta.
+    size_t paso = ((uint32_t)(ahora_ms - m->inicio_ms) / LCD_PASO_MS) % (largo + 5);
+    pos = paso < 3 ? 0 : paso - 2;
+  }
+  for (size_t i = 0; i < LCD_COLUMNAS; i++) {
+    size_t p = largo > LCD_COLUMNAS ? (pos + i) % (largo + 3) : i;
+    salida[i] = p < largo ? m->texto[p] : ' ';
+  }
+  salida[LCD_COLUMNAS] = '\0';
+}
+
 static const char *saltar_blancos(const char *p) {
   while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
   return p;
@@ -217,6 +237,64 @@ bool parsear_texto_json(const char *cuerpo, const char *clave, char *dst, size_t
 int formatear_m(char *dst, size_t cap, int fila, const char *texto) {
   int n = snprintf(dst, cap, "M %d %s", fila, texto);
   return (n < 0 || (size_t)n >= cap) ? -1 : n;
+}
+
+int parsear_programa_json(const char *json, programa_wifi_t *p) {
+  p->id[0] = '\0';
+  p->largo = 0;
+  const char *inicio = saltar_blancos(json);
+  if (*inicio != '[') return -1;
+  if (*saltar_blancos(inicio + 1) == ']') return 0;
+  char id[38], hex[PROGRAMA_MAX * 2 + 2];
+  if (!parsear_texto_json(json, "id", id, sizeof id) || strlen(id) != 36) return -1;
+  for (size_t i = 0; i < 36; i++) {
+    bool guion = i == 8 || i == 13 || i == 18 || i == 23;
+    if (guion ? id[i] != '-' : valor_hex(id[i]) < 0) return -1;
+  }
+  strcpy(p->id, id); // permite confirmar como error una carga con codigo invalido
+  if (!parsear_texto_json(json, "codigo", hex, sizeof hex)) return -1;
+  int n = hex_a_bytes(hex, p->bytes, sizeof p->bytes);
+  if (n <= 0) return -1;
+  p->largo = (size_t)n;
+  return 1;
+}
+
+static bool programa_ok(intercambio_programa_t intercambio, void *ctx, const char *cmd,
+                        char *detalle, size_t cap) {
+  char resp[96];
+  if (!intercambio(cmd, resp, sizeof resp, ctx)) {
+    snprintf(detalle, cap, "Sin confirmacion del entrenador (%c)", cmd[0]);
+    return false;
+  }
+  if (strcmp(resp, "OK") != 0) {
+    snprintf(detalle, cap, "Entrenador (%c): %.96s", cmd[0], resp);
+    return false;
+  }
+  return true;
+}
+
+bool enviar_programa_wifi(const programa_wifi_t *p, intercambio_programa_t intercambio,
+                         void *ctx, char *detalle, size_t cap) {
+  if (p->largo == 0 || p->largo > PROGRAMA_MAX) {
+    snprintf(detalle, cap, "Programa vacio o demasiado largo");
+    return false;
+  }
+  if (!programa_ok(intercambio, ctx, "B", detalle, cap)) return false;
+  uint16_t suma = 0;
+  for (size_t pos = 0; pos < p->largo; pos += 32) {
+    size_t n = p->largo - pos < 32 ? p->largo - pos : 32;
+    char hex[65], cmd[80];
+    bytes_a_hex(p->bytes + pos, n, hex);
+    snprintf(cmd, sizeof cmd, "D %u %s", (unsigned)pos, hex);
+    for (size_t i = 0; i < n; i++) suma += p->bytes[pos + i];
+    if (!programa_ok(intercambio, ctx, cmd, detalle, cap)) return false;
+  }
+  char fin[32];
+  snprintf(fin, sizeof fin, "E %u %u", (unsigned)p->largo, suma);
+  if (!programa_ok(intercambio, ctx, fin, detalle, cap) ||
+      !programa_ok(intercambio, ctx, "R", detalle, cap)) return false;
+  snprintf(detalle, cap, "Programa en marcha (%u bytes)", (unsigned)p->largo);
+  return true;
 }
 
 // Copia src como cadena JSON (con comillas). Devuelve bytes escritos o -1.

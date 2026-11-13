@@ -27,9 +27,9 @@ static lectura_t leer_byte(TickType_t espera) {
   return acum_byte(&acum, (char)c, false) == ACUM_LINEA ? LINEA : BYTE;
 }
 
-bool entrenador_transaccion(const char *cmd, char *respuesta, size_t cap) {
+static bool transaccion_bloqueada(const char *cmd, char *respuesta, size_t cap, void *ctx) {
+  (void)ctx;
   bool ok = false;
-  xSemaphoreTake(mutex, portMAX_DELAY);
   uart_write_bytes(UART_ENTRENADOR, cmd, strlen(cmd));
   uart_write_bytes(UART_ENTRENADOR, "\n", 1);
 
@@ -45,6 +45,19 @@ bool entrenador_transaccion(const char *cmd, char *respuesta, size_t cap) {
     }
     if (acum.buf[0]) anfitrion_linea(acum.buf);  // intermedia: la app la registra
   }
+  return ok;
+}
+
+bool entrenador_transaccion(const char *cmd, char *respuesta, size_t cap) {
+  xSemaphoreTake(mutex, portMAX_DELAY);
+  bool ok = transaccion_bloqueada(cmd, respuesta, cap, NULL);
+  xSemaphoreGive(mutex);
+  return ok;
+}
+
+bool entrenador_programa(const programa_wifi_t *p, char *detalle, size_t cap) {
+  xSemaphoreTake(mutex, portMAX_DELAY);
+  bool ok = enviar_programa_wifi(p, transaccion_bloqueada, NULL, detalle, cap);
   xSemaphoreGive(mutex);
   return ok;
 }

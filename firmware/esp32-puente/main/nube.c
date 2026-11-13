@@ -7,16 +7,18 @@
 // no espera por la red.
 #include <stdio.h>
 #include <string.h>
+#include "cJSON.h"
 
 #include "esp_crt_bundle.h"
 #include "esp_http_client.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "protocolo.h"
 #include "puente.h"
 
 #define ESPERA_HTTP_MS 4000
-#define CUERPO_MAX 512
+#define CUERPO_MAX 4096
 
 typedef enum { NUBE_APAGADA, NUBE_OK, NUBE_ERROR } estado_nube_t;
 
@@ -40,6 +42,10 @@ static char cliente_url[sizeof cfg.url], cliente_llave[sizeof cfg.llave];
 
 static char cuerpo[CUERPO_MAX];
 static int largo_cuerpo;
+static bool cuerpo_desbordado;
+static SemaphoreHandle_t mutex_lcd;
+static mensaje_lcd_t mensajes[2];
+static bool lcd_disponible, lcd_activo;
 
 const char *nube_estado(void) {
   switch (estado) {
@@ -50,10 +56,13 @@ const char *nube_estado(void) {
 }
 
 static esp_err_t al_evento_http(esp_http_client_event_t *ev) {
-  if (ev->event_id == HTTP_EVENT_ON_DATA && largo_cuerpo + ev->data_len < CUERPO_MAX) {
-    memcpy(cuerpo + largo_cuerpo, ev->data, ev->data_len);
-    largo_cuerpo += ev->data_len;
-    cuerpo[largo_cuerpo] = '\0';
+  if (ev->event_id == HTTP_EVENT_ON_DATA) {
+    if (largo_cuerpo + ev->data_len >= CUERPO_MAX) cuerpo_desbordado = true;
+    else if (!cuerpo_desbordado) {
+      memcpy(cuerpo + largo_cuerpo, ev->data, ev->data_len);
+      largo_cuerpo += ev->data_len;
+      cuerpo[largo_cuerpo] = '\0';
+    }
   }
   return ESP_OK;
 }
@@ -91,6 +100,7 @@ static bool abrir_cliente(const char *url_inicial) {
 // Hace el pedido y devuelve el codigo HTTP (o -1). El cuerpo queda en cuerpo.
 static int pedir(const char *url, esp_http_client_method_t metodo, const char *datos) {
   largo_cuerpo = 0;
+  cuerpo_desbordado = false;
   cuerpo[0] = '\0';
   esp_http_client_set_url(cliente, url);
   esp_http_client_set_method(cliente, metodo);
@@ -102,7 +112,52 @@ static int pedir(const char *url, esp_http_client_method_t metodo, const char *d
     cerrar_cliente();  // conexion rota: el proximo ciclo abre otra
     return -1;
   }
-  return esp_http_client_get_status_code(cliente);
+  return cuerpo_desbordado ? -2 : esp_http_client_get_status_code(cliente);
+}
+
+// Una carga se reclama en la base ANTES de enviarla. Si se reinicia el ESP32 o se
+// pierde el acuse HTTP, nunca se vuelve a ejecutar automaticamente.
+static programa_wifi_t programa;
+static char resultado_programa[384];
+static bool confirmar_programa;
+
+static bool cargas_wifi(void) {
+  char url[sizeof cfg.url + 128];
+  if (confirmar_programa) {
+    snprintf(url, sizeof url, "%s/rest/v1/programas?id=eq.%s&estado=eq.enviando", cfg.url, programa.id);
+    int codigo = pedir(url, HTTP_METHOD_PATCH, resultado_programa);
+    if (codigo < 200 || codigo >= 300) return fallo("confirmar-programa", codigo);
+    confirmar_programa = false;
+  }
+  char json[256];
+  cJSON *peticion = cJSON_CreateObject();
+  if (!peticion) return fallo("memoria", 0);
+  cJSON_AddStringToObject(peticion, "p_dispositivo", cfg.dispositivo);
+  bool cabe = cJSON_PrintPreallocated(peticion, json, sizeof json, false);
+  cJSON_Delete(peticion);
+  if (!cabe) return fallo("json-programa", 0);
+  snprintf(url, sizeof url, "%s/rest/v1/rpc/reclamar_programa", cfg.url);
+  esp_http_client_set_header(cliente, "Prefer", "return=representation");
+  int codigo = pedir(url, HTTP_METHOD_POST, json);
+  if (cliente) esp_http_client_set_header(cliente, "Prefer", "return=minimal");
+  // Permite instalar este firmware antes de la migracion de la base.
+  if (codigo == 404) return true;
+  if (codigo != 200) return fallo("reclamar-programa", codigo);
+  int carga = parsear_programa_json(cuerpo, &programa);
+  if (carga == 0) return true;
+  if (!programa.id[0]) return fallo("programa-invalido", 0);
+  char razon[128] = "Codigo invalido";
+  bool ok = carga == 1 && entrenador_programa(&programa, razon, sizeof razon);
+  cJSON *resultado = cJSON_CreateObject();
+  if (!resultado) return fallo("memoria", 0);
+  cJSON_AddStringToObject(resultado, "estado", ok ? "ejecutado" : "error");
+  cJSON_AddStringToObject(resultado, "detalle", razon);
+  cabe = cJSON_PrintPreallocated(resultado, resultado_programa, sizeof resultado_programa, false);
+  cJSON_Delete(resultado);
+  if (!cabe) return fallo("json-programa", 0);
+  // Se confirma en el proximo ciclo; los reintentos HTTP no repiten la carga serie.
+  confirmar_programa = true;
+  return true;
 }
 
 static bool ciclo(void) {
@@ -110,6 +165,8 @@ static bool ciclo(void) {
   static char json[160];
   if (url_controles(url, sizeof url, cfg.url, cfg.dispositivo) < 0) return fallo("url", 0);
   if (!abrir_cliente(url)) return fallo("cliente", 0);
+
+  if (!cargas_wifi()) return false;
 
   int16_t e[4], s[4];
   int codigo = pedir(url, HTTP_METHOD_GET, NULL);
@@ -121,15 +178,18 @@ static bool ciclo(void) {
   if (!entrenador_transaccion(cmd, resp, sizeof resp) || !parsear_respuesta_c(resp, s))
     return fallo("entrenador", 0);
 
-  // Texto del LCD: se manda en cada ciclo (si el ATmega se reinicio, lo recupera solo).
-  // Un firmware viejo contesta "ERR comando": no es motivo para cortar el ciclo.
+  // Copiar los mensajes completos: otra tarea mueve la ventana sin esperar al HTTP.
   static const char *claves[2] = {"lcd1", "lcd2"};
+  char textos[2][LCD_TEXTO_MAX + 1];
   for (int fila = 0; fila < 2; fila++) {
-    char texto[17], linea[24];
-    if (parsear_texto_json(cuerpo, claves[fila], texto, sizeof texto) &&
-        formatear_m(linea, sizeof linea, fila, texto) > 0)
-      entrenador_transaccion(linea, resp, sizeof resp);
+    if (!parsear_texto_json(cuerpo, claves[fila], textos[fila], sizeof textos[fila]))
+      return fallo("texto-lcd", 0);
   }
+  xSemaphoreTake(mutex_lcd, portMAX_DELAY);
+  for (int fila = 0; fila < 2; fila++)
+    lcd_actualizar(&mensajes[fila], textos[fila], xTaskGetTickCount() * portTICK_PERIOD_MS);
+  lcd_disponible = true;
+  xSemaphoreGive(mutex_lcd);
 
   if (url_lecturas(url, sizeof url, cfg.url) < 0) return fallo("url", 0);
   if (json_lectura(json, sizeof json, cfg.dispositivo, s, e) < 0) return fallo("json", 0);
@@ -150,6 +210,11 @@ static void tarea_nube(void *arg) {
   for (;;) {
     TickType_t inicio = xTaskGetTickCount();
     config_copiar(&cfg);
+    size_t largo_url = strlen(cfg.url);
+    while (largo_url && cfg.url[largo_url - 1] == '/') cfg.url[--largo_url] = '\0';
+    xSemaphoreTake(mutex_lcd, portMAX_DELAY);
+    lcd_activo = cfg.nube;
+    xSemaphoreGive(mutex_lcd);
     if (!cfg.nube) {
       estado = NUBE_APAGADA;
       cerrar_cliente();
@@ -170,4 +235,32 @@ static void tarea_nube(void *arg) {
   }
 }
 
-void nube_iniciar(void) { xTaskCreate(tarea_nube, "nube", 10240, NULL, 4, NULL); }
+static void tarea_lcd(void *arg) {
+  (void)arg;
+  for (;;) {
+    TickType_t inicio = xTaskGetTickCount();
+    char filas[2][LCD_COLUMNAS + 1];
+    xSemaphoreTake(mutex_lcd, portMAX_DELAY);
+    bool enviar = lcd_activo && lcd_disponible;
+    if (enviar) for (int f = 0; f < 2; f++)
+      lcd_ventana(&mensajes[f], inicio * portTICK_PERIOD_MS, filas[f]);
+    xSemaphoreGive(mutex_lcd);
+    if (enviar && !isp_activo()) {
+      for (int f = 0; f < 2; f++) {
+        char linea[24], resp[64];
+        formatear_m(linea, sizeof linea, f, filas[f]);
+        // Reenviar tambien las filas quietas recupera el LCD tras un reset del ATmega.
+        if (!entrenador_transaccion(linea, resp, sizeof resp)) break;
+      }
+    }
+    TickType_t usado = xTaskGetTickCount() - inicio;
+    TickType_t periodo = pdMS_TO_TICKS(LCD_PASO_MS);
+    vTaskDelay(usado < periodo ? periodo - usado : pdMS_TO_TICKS(20));
+  }
+}
+
+void nube_iniciar(void) {
+  mutex_lcd = xSemaphoreCreateMutex();
+  xTaskCreate(tarea_lcd, "lcd-nube", 3072, NULL, 4, NULL);
+  xTaskCreate(tarea_nube, "nube", 10240, NULL, 4, NULL);
+}

@@ -1,6 +1,8 @@
 // Tablero de la nube (Supabase, carpeta nube/): lecturas que sube el ESP32 y las
 // entradas que el tablero le manda al entrenador. Esquema en INTEGRADOR.md.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { textoLcd } from './texto-lcd'
+export { textoLcd, MAX_TEXTO_LCD } from './texto-lcd'
 
 export interface ConfigNube {
   url: string
@@ -107,14 +109,39 @@ export async function leerTextos(c: ConfigNube): Promise<[string, string]> {
   return [f?.lcd1 ?? '', f?.lcd2 ?? '']
 }
 
-// Solo lo que el LCD puede mostrar: ASCII imprimible, 16 columnas (la tabla lo exige igual)
-export function textoLcd(t: string) {
-  return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^ -~]/g, '?').slice(0, 16)
-}
-
 export async function fijarTexto(c: ConfigNube, fila: 0 | 1, texto: string) {
   const cambio = fila === 0 ? { lcd1: textoLcd(texto) } : { lcd2: textoLcd(texto) }
   comprobar(await supabase(c).from('controles').update(cambio).eq('dispositivo', c.dispositivo).select('dispositivo'))
+}
+
+export async function ejecutarPorWifi(c: ConfigNube, bytes: number[], informar: (estado: string) => void) {
+  if (!c.url || !c.llave || !c.dispositivo) throw new Error('Configura la conexión en Nube antes de ejecutar por Wi-Fi.')
+  if (!bytes.length || bytes.length > 768 || bytes.some((b) => !Number.isInteger(b) || b < 0 || b > 255)) {
+    throw new Error('El programa no es válido para el entrenador.')
+  }
+  const sb = supabase(c)
+  const codigo = bytes.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join('')
+  informar('Enviando programa a la nube…')
+  const envio = await sb.rpc('enviar_programa', { p_dispositivo: c.dispositivo, p_codigo: codigo }).abortSignal(AbortSignal.timeout(10000))
+  if (envio.error?.code === '23505') throw new Error('Ya hay una carga pendiente para este entrenador. Espera a que termine o expire.')
+  const id = comprobar(envio) as string
+  if (!id) throw new Error('La nube no confirmó la recepción del programa. Revisa Nube antes de volver a enviarlo.')
+  let anterior = ''
+  const limite = Date.now() + 120000
+  while (Date.now() < limite) {
+    const fila = comprobar(await sb.from('programas').select('estado, detalle').eq('id', id).abortSignal(AbortSignal.timeout(10000)).single()) as {
+      estado: string; detalle: string
+    }
+    if (fila.estado === 'error') throw new Error(fila.detalle)
+    if (fila.estado === 'ejecutado') return
+    if (fila.estado !== anterior) {
+      informar(fila.estado === 'pendiente' ? 'Esperando al ESP32 por Wi-Fi…' : 'ESP32 cargando el programa en el entrenador…')
+      anterior = fila.estado
+    }
+    // Si el ESP32 esta apagado, el servidor no lo ejecutara al reaparecer despues de 60 s.
+    await new Promise((r) => setTimeout(r, 1000))
+  }
+  throw new Error('No llegó la confirmación del ESP32. Revisa Wi-Fi y Nube; no se reenviará el programa automáticamente.')
 }
 
 // Cambia una entrada (1..4) sin tocar las demas

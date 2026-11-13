@@ -52,7 +52,8 @@ h2 {
 
 button,
 select,
-input {
+input,
+textarea {
   font: inherit;
   color: var(--texto);
   background: var(--superficie-2);
@@ -72,14 +73,16 @@ button:hover:not(:disabled) {
 
 button:disabled,
 select:disabled,
-input:disabled {
+input:disabled,
+textarea:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
 button:focus-visible,
 select:focus-visible,
-input:focus-visible {
+input:focus-visible,
+textarea:focus-visible {
   outline: 2px solid var(--acento);
   outline-offset: 1px;
 }
@@ -684,7 +687,8 @@ button.primario {
   color: var(--texto-suave);
 }
 
-.campo input {
+.campo input,
+.campo textarea {
   min-width: 0;
   padding: 6px 8px;
   background: var(--fondo);
@@ -694,6 +698,8 @@ button.primario {
   font: inherit;
   font-size: 13px;
 }
+
+.campo textarea { resize: vertical; }
 
 /* ---- Tablero de la nube ---- */
 

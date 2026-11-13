@@ -172,6 +172,72 @@ static void probar_nube(void) {
   VERIFICAR(url_lecturas(buf, 10, "https://abc.supabase.co") == -1);
 }
 
+static void probar_desplazamiento(void) {
+  mensaje_lcd_t m = {0};
+  char v[17];
+  lcd_ventana(&m, 0, v);
+  VERIFICAR(strcmp(v, "                ") == 0);
+  lcd_actualizar(&m, "Hola", 100);
+  lcd_ventana(&m, 100000, v);
+  VERIFICAR(strcmp(v, "Hola            ") == 0);
+  lcd_actualizar(&m, "0123456789abcdef", 200);
+  lcd_ventana(&m, 999999, v);
+  VERIFICAR(strcmp(v, "0123456789abcdef") == 0);
+  lcd_actualizar(&m, "0123456789abcdefG", 1000);
+  lcd_ventana(&m, 1800, v);
+  VERIFICAR(strcmp(v, "0123456789abcdef") == 0);
+  lcd_ventana(&m, 2200, v);
+  VERIFICAR(strcmp(v, "123456789abcdefG") == 0);
+  lcd_actualizar(&m, "0123456789abcdefG", 2200);
+  lcd_ventana(&m, 2600, v);
+  VERIFICAR(strcmp(v, "23456789abcdefG ") == 0); // GET repetido no reinicia
+  lcd_ventana(&m, 1000 + 22 * LCD_PASO_MS, v);
+  VERIFICAR(strcmp(v, "0123456789abcdef") == 0); // vuelve al inicio
+  lcd_actualizar(&m, "Nuevo", 3000);
+  lcd_ventana(&m, 3000, v);
+  VERIFICAR(strcmp(v, "Nuevo           ") == 0); // limpia restos
+  char largo[200]; memset(largo, 'x', sizeof largo); largo[199] = 0;
+  lcd_actualizar(&m, largo, UINT32_MAX - 100);
+  VERIFICAR(strlen(m.texto) == LCD_TEXTO_MAX);
+  lcd_ventana(&m, 1099, v); // reloj de 32 bits desbordado: 1200 ms
+  VERIFICAR(strlen(v) == 16);
+}
+
+typedef struct { int llamadas; char fallar; bool timeout; char comandos[30][80]; } carga_falsa_t;
+static bool intercambio_falso(const char *cmd, char *resp, size_t cap, void *ctx) {
+  carga_falsa_t *f = ctx;
+  snprintf(f->comandos[f->llamadas++], 80, "%s", cmd);
+  snprintf(resp, cap, "%s", cmd[0] == f->fallar ? "ERR suma" : "OK");
+  return !(f->timeout && cmd[0] == f->fallar);
+}
+
+static void probar_programa_wifi(void) {
+  programa_wifi_t p;
+  VERIFICAR(parsear_programa_json("[]", &p) == 0);
+  VERIFICAR(parsear_programa_json("{}", &p) == -1);
+  VERIFICAR(parsear_programa_json("[{\"id\":\"invalido\",\"codigo\":\"FF\"}]", &p) == -1);
+  VERIFICAR(parsear_programa_json("[{\"id\":\"12345678-1234-1234-1234-123456789abc\",\"codigo\":\"00FF01\"}]", &p) == 1);
+  VERIFICAR(p.largo == 3 && p.bytes[1] == 255);
+  char detalle[160];
+  carga_falsa_t f = {0};
+  VERIFICAR(enviar_programa_wifi(&p, intercambio_falso, &f, detalle, sizeof detalle));
+  VERIFICAR(f.llamadas == 4 && strcmp(f.comandos[0], "B") == 0);
+  VERIFICAR(strcmp(f.comandos[1], "D 0 00FF01") == 0);
+  VERIFICAR(strcmp(f.comandos[2], "E 3 256") == 0 && strcmp(f.comandos[3], "R") == 0);
+  f = (carga_falsa_t){ .fallar = 'E' };
+  VERIFICAR(!enviar_programa_wifi(&p, intercambio_falso, &f, detalle, sizeof detalle));
+  VERIFICAR(f.llamadas == 3 && strstr(detalle, "ERR suma") != NULL); // no ejecuta
+  f = (carga_falsa_t){ .fallar = 'D', .timeout = true };
+  VERIFICAR(!enviar_programa_wifi(&p, intercambio_falso, &f, detalle, sizeof detalle));
+  VERIFICAR(f.llamadas == 2 && strstr(detalle, "Sin confirmacion") != NULL);
+  p.largo = PROGRAMA_MAX; memset(p.bytes, 255, p.largo);
+  f = (carga_falsa_t){0};
+  VERIFICAR(enviar_programa_wifi(&p, intercambio_falso, &f, detalle, sizeof detalle));
+  VERIFICAR(f.llamadas == 27 && strcmp(f.comandos[25], "E 768 64768") == 0);
+  VERIFICAR(parsear_programa_json("[{\"id\":\"12345678-1234-1234-1234-123456789abc\",\"codigo\":\"0\"}]", &p) == -1);
+  VERIFICAR(parsear_programa_json("[{\"id\":\"12345678-1234-1234-1234-123456789abc\",\"codigo\":\"XX\"}]", &p) == -1);
+}
+
 static void probar_isp(void) {
   uint32_t dir;
   uint8_t datos[ISP_PAGINA_BYTES];
@@ -228,6 +294,8 @@ int main(void) {
   probar_hex();
   probar_nube();
   probar_isp();
+  probar_desplazamiento();
+  probar_programa_wifi();
   printf("%d de %d verificaciones pasaron\n", total - fallas, total);
   return fallas ? 1 : 0;
 }
