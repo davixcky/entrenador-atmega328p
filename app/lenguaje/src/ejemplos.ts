@@ -102,12 +102,13 @@ siempre {
   {
     nombre: 'Control desde la nube',
     codigo: `// Todo desde Supabase (tablero Nube o Studio, tabla controles):
-//   lcd1 / lcd2 -> filas del LCD, canal 2 -> LEDs, canal 3 -> displays
+//   lcd1 / lcd2 -> filas del LCD, canal 1 -> brillo, canal 2 -> LEDs, canal 3 -> displays
 // y el potenciómetro sube a la nube como ADC (canal 1)
 lcd_limpiar()
 siempre {
   lcd_nube(0)
   lcd_nube(1)
+  brillo(nube(1))
   leds(nube(2))
   mostrar(nube(3))
   nube_enviar(1, pot())

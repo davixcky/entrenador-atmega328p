@@ -119,17 +119,20 @@ void bytes_a_hex(const uint8_t *src, size_t n, char *dst) {
 
 // ---- Nube ----
 
-void lcd_actualizar(mensaje_lcd_t *m, const char *texto, uint32_t ahora_ms) {
-  if (strncmp(m->texto, texto, LCD_TEXTO_MAX) == 0) return;
+void lcd_actualizar(mensaje_lcd_t *m, const char *texto, bool desplazar, uint32_t paso_ms, uint32_t ahora_ms) {
+  if (paso_ms != 200 && paso_ms != 400 && paso_ms != 800) paso_ms = LCD_PASO_MS;
+  if (strncmp(m->texto, texto, LCD_TEXTO_MAX) == 0 && m->desplazar == desplazar && m->paso_ms == paso_ms) return;
   snprintf(m->texto, sizeof m->texto, "%.*s", LCD_TEXTO_MAX, texto);
   m->inicio_ms = ahora_ms;
+  m->desplazar = desplazar;
+  m->paso_ms = paso_ms;
 }
 
 void lcd_ventana(const mensaje_lcd_t *m, uint32_t ahora_ms, char salida[LCD_COLUMNAS + 1]) {
   size_t largo = strlen(m->texto), pos = 0;
-  if (largo > LCD_COLUMNAS) {
-    // Tres espacios entre vueltas; pausa de 1.2 s al principio de cada vuelta.
-    size_t paso = ((uint32_t)(ahora_ms - m->inicio_ms) / LCD_PASO_MS) % (largo + 5);
+  if (largo > LCD_COLUMNAS && m->desplazar) {
+    // Tres espacios entre vueltas; pausa de tres pasos al empezar.
+    size_t paso = ((uint32_t)(ahora_ms - m->inicio_ms) / m->paso_ms) % (largo + 5);
     pos = paso < 3 ? 0 : paso - 2;
   }
   for (size_t i = 0; i < LCD_COLUMNAS; i++) {
@@ -142,6 +145,35 @@ void lcd_ventana(const mensaje_lcd_t *m, uint32_t ahora_ms, char salida[LCD_COLU
 static const char *saltar_blancos(const char *p) {
   while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
   return p;
+}
+
+bool parsear_opciones_lcd_json(const char *json, int fila, bool *desplazar, uint32_t *paso_ms) {
+  if (fila < 0 || fila > 1 || *saltar_blancos(json) != '[') return false;
+  *desplazar = true;
+  *paso_ms = LCD_PASO_MS;
+  for (int opcion = 0; opcion < 2; opcion++) {
+    char clave[24];
+    snprintf(clave, sizeof clave, "\"lcd%d_%s\"", fila + 1, opcion == 0 ? "scroll" : "ms");
+    const char *p = strstr(json, clave);
+    if (!p) continue;
+    p = saltar_blancos(p + strlen(clave));
+    if (*p != ':') return false;
+    p = saltar_blancos(p + 1);
+    if (opcion == 0) {
+      if (strncmp(p, "true", 4) == 0) p += 4;
+      else if (strncmp(p, "false", 5) == 0) { *desplazar = false; p += 5; }
+      else return false;
+    } else {
+      char *fin;
+      long valor = strtol(p, &fin, 10);
+      if (fin == p || (valor != 200 && valor != 400 && valor != 800)) return false;
+      *paso_ms = (uint32_t)valor;
+      p = fin;
+    }
+    p = saltar_blancos(p);
+    if (*p != ',' && *p != '}') return false;
+  }
+  return true;
 }
 
 bool parsear_entradas_json(const char *cuerpo, int16_t e[4]) {
@@ -368,7 +400,7 @@ static size_t largo_base(const char *base) {
 int url_controles(char *dst, size_t cap, const char *base, const char *dispositivo) {
   char id[96];
   if (url_codificar(id, sizeof id, dispositivo) < 0) return -1;
-  int n = snprintf(dst, cap, "%.*s/rest/v1/controles?dispositivo=eq.%s&select=entradas,lcd1,lcd2",
+  int n = snprintf(dst, cap, "%.*s/rest/v1/controles?dispositivo=eq.%s&select=*",
                    (int)largo_base(base), base, id);
   return (n < 0 || (size_t)n >= cap) ? -1 : n;
 }

@@ -700,6 +700,8 @@ button.primario {
 }
 
 .campo textarea { resize: vertical; }
+.lcd-desplazar { display: flex; align-items: center; gap: 8px; }
+.lcd-desplazar input { min-height: auto; }
 
 /* ---- Tablero de la nube ---- */
 

@@ -102,15 +102,23 @@ export async function leerEntradas(c: ConfigNube): Promise<number[]> {
   return (fila as { entradas: number[] }).entradas
 }
 
-// Texto del LCD que el programa muestra con lcd_nube(0) y lcd_nube(1)
-export async function leerTextos(c: ConfigNube): Promise<[string, string]> {
-  const fila = comprobar(await supabase(c).from('controles').select('lcd1, lcd2').eq('dispositivo', c.dispositivo).maybeSingle())
-  const f = fila as { lcd1?: string; lcd2?: string } | null
-  return [f?.lcd1 ?? '', f?.lcd2 ?? '']
+export interface FilaLcd { texto: string; desplazar: boolean; pasoMs: number }
+
+// Texto y desplazamiento independientes para cada fila.
+export async function leerLcd(c: ConfigNube): Promise<[FilaLcd, FilaLcd]> {
+  const f = comprobar(await supabase(c).from('controles').select('lcd1, lcd2, lcd1_scroll, lcd2_scroll, lcd1_ms, lcd2_ms').eq('dispositivo', c.dispositivo).maybeSingle()) as {
+    lcd1: string; lcd2: string; lcd1_scroll: boolean; lcd2_scroll: boolean; lcd1_ms: number; lcd2_ms: number
+  } | null
+  return [
+    { texto: f?.lcd1 ?? '', desplazar: f?.lcd1_scroll ?? true, pasoMs: f?.lcd1_ms ?? 400 },
+    { texto: f?.lcd2 ?? '', desplazar: f?.lcd2_scroll ?? true, pasoMs: f?.lcd2_ms ?? 400 },
+  ]
 }
 
-export async function fijarTexto(c: ConfigNube, fila: 0 | 1, texto: string) {
-  const cambio = fila === 0 ? { lcd1: textoLcd(texto) } : { lcd2: textoLcd(texto) }
+export async function fijarLcd(c: ConfigNube, fila: 0 | 1, valor: FilaLcd) {
+  const cambio = fila === 0
+    ? { lcd1: textoLcd(valor.texto), lcd1_scroll: valor.desplazar, lcd1_ms: valor.pasoMs }
+    : { lcd2: textoLcd(valor.texto), lcd2_scroll: valor.desplazar, lcd2_ms: valor.pasoMs }
   comprobar(await supabase(c).from('controles').update(cambio).eq('dispositivo', c.dispositivo).select('dispositivo'))
 }
 

@@ -166,7 +166,7 @@ static void probar_nube(void) {
   VERIFICAR(url_controles(buf, sizeof buf, "http://192.168.1.10:54321/", "entrenador-1") > 0);
   VERIFICAR(strcmp(buf,
                    "http://192.168.1.10:54321/rest/v1/controles"
-                   "?dispositivo=eq.entrenador-1&select=entradas,lcd1,lcd2") == 0);
+                   "?dispositivo=eq.entrenador-1&select=*") == 0);
   VERIFICAR(url_lecturas(buf, sizeof buf, "https://abc.supabase.co") > 0);
   VERIFICAR(strcmp(buf, "https://abc.supabase.co/rest/v1/lecturas") == 0);
   VERIFICAR(url_lecturas(buf, 10, "https://abc.supabase.co") == -1);
@@ -177,30 +177,57 @@ static void probar_desplazamiento(void) {
   char v[17];
   lcd_ventana(&m, 0, v);
   VERIFICAR(strcmp(v, "                ") == 0);
-  lcd_actualizar(&m, "Hola", 100);
+  lcd_actualizar(&m, "Hola", true, LCD_PASO_MS, 100);
   lcd_ventana(&m, 100000, v);
   VERIFICAR(strcmp(v, "Hola            ") == 0);
-  lcd_actualizar(&m, "0123456789abcdef", 200);
+  lcd_actualizar(&m, "0123456789abcdef", true, LCD_PASO_MS, 200);
   lcd_ventana(&m, 999999, v);
   VERIFICAR(strcmp(v, "0123456789abcdef") == 0);
-  lcd_actualizar(&m, "0123456789abcdefG", 1000);
+  lcd_actualizar(&m, "0123456789abcdefG", true, LCD_PASO_MS, 1000);
   lcd_ventana(&m, 1800, v);
   VERIFICAR(strcmp(v, "0123456789abcdef") == 0);
   lcd_ventana(&m, 2200, v);
   VERIFICAR(strcmp(v, "123456789abcdefG") == 0);
-  lcd_actualizar(&m, "0123456789abcdefG", 2200);
+  lcd_actualizar(&m, "0123456789abcdefG", true, LCD_PASO_MS, 2200);
   lcd_ventana(&m, 2600, v);
   VERIFICAR(strcmp(v, "23456789abcdefG ") == 0); // GET repetido no reinicia
   lcd_ventana(&m, 1000 + 22 * LCD_PASO_MS, v);
   VERIFICAR(strcmp(v, "0123456789abcdef") == 0); // vuelve al inicio
-  lcd_actualizar(&m, "Nuevo", 3000);
+  lcd_actualizar(&m, "Nuevo", true, LCD_PASO_MS, 3000);
   lcd_ventana(&m, 3000, v);
   VERIFICAR(strcmp(v, "Nuevo           ") == 0); // limpia restos
   char largo[200]; memset(largo, 'x', sizeof largo); largo[199] = 0;
-  lcd_actualizar(&m, largo, UINT32_MAX - 100);
+  lcd_actualizar(&m, largo, true, LCD_PASO_MS, UINT32_MAX - 100);
   VERIFICAR(strlen(m.texto) == LCD_TEXTO_MAX);
   lcd_ventana(&m, 1099, v); // reloj de 32 bits desbordado: 1200 ms
   VERIFICAR(strlen(v) == 16);
+}
+
+static void probar_controles_lcd(void) {
+  bool desplazar;
+  uint32_t ms;
+  VERIFICAR(parsear_opciones_lcd_json("[{\"lcd1\":\"Hola\"}]", 0, &desplazar, &ms));
+  VERIFICAR(desplazar && ms == 400);
+  const char *j = "[{\"lcd1_scroll\":false,\"lcd1_ms\":800,\"lcd2_scroll\":true,\"lcd2_ms\":200}]";
+  VERIFICAR(parsear_opciones_lcd_json(j, 0, &desplazar, &ms) && !desplazar && ms == 800);
+  VERIFICAR(parsear_opciones_lcd_json(j, 1, &desplazar, &ms) && desplazar && ms == 200);
+  VERIFICAR(!parsear_opciones_lcd_json("[{\"lcd1_ms\":0}]", 0, &desplazar, &ms));
+  VERIFICAR(!parsear_opciones_lcd_json("[{\"lcd1_scroll\":1}]", 0, &desplazar, &ms));
+  mensaje_lcd_t m = {0}; char v[17];
+  lcd_actualizar(&m, "0123456789abcdefG", false, 200, 1000);
+  lcd_ventana(&m, 9000, v);
+  VERIFICAR(strcmp(v, "0123456789abcdef") == 0); // desactivado: primera pantalla
+  lcd_actualizar(&m, "0123456789abcdefG", true, 200, 9000);
+  lcd_ventana(&m, 9600, v);
+  VERIFICAR(strcmp(v, "123456789abcdefG") == 0); // rapido
+  lcd_actualizar(&m, "0123456789abcdefG", true, 800, 10000);
+  lcd_ventana(&m, 10600, v);
+  VERIFICAR(strcmp(v, "0123456789abcdef") == 0); // lento todavia espera
+  lcd_ventana(&m, 12400, v);
+  VERIFICAR(strcmp(v, "123456789abcdefG") == 0);
+  lcd_actualizar(&m, "0123456789abcdefG", true, 800, 12400);
+  lcd_ventana(&m, 13200, v);
+  VERIFICAR(strcmp(v, "23456789abcdefG ") == 0); // lectura repetida no reinicia
 }
 
 typedef struct { int llamadas; char fallar; bool timeout; char comandos[30][80]; } carga_falsa_t;
@@ -295,6 +322,7 @@ int main(void) {
   probar_nube();
   probar_isp();
   probar_desplazamiento();
+  probar_controles_lcd();
   probar_programa_wifi();
   printf("%d de %d verificaciones pasaron\n", total - fallas, total);
   return fallas ? 1 : 0;

@@ -161,7 +161,7 @@ static bool cargas_wifi(void) {
 }
 
 static bool ciclo(void) {
-  static char url[sizeof cfg.url + 128];
+  static char url[sizeof cfg.url + 256];
   static char json[160];
   if (url_controles(url, sizeof url, cfg.url, cfg.dispositivo) < 0) return fallo("url", 0);
   if (!abrir_cliente(url)) return fallo("cliente", 0);
@@ -181,13 +181,16 @@ static bool ciclo(void) {
   // Copiar los mensajes completos: otra tarea mueve la ventana sin esperar al HTTP.
   static const char *claves[2] = {"lcd1", "lcd2"};
   char textos[2][LCD_TEXTO_MAX + 1];
+  bool desplazar[2];
+  uint32_t paso_ms[2];
   for (int fila = 0; fila < 2; fila++) {
-    if (!parsear_texto_json(cuerpo, claves[fila], textos[fila], sizeof textos[fila]))
+    if (!parsear_texto_json(cuerpo, claves[fila], textos[fila], sizeof textos[fila]) ||
+        !parsear_opciones_lcd_json(cuerpo, fila, &desplazar[fila], &paso_ms[fila]))
       return fallo("texto-lcd", 0);
   }
   xSemaphoreTake(mutex_lcd, portMAX_DELAY);
   for (int fila = 0; fila < 2; fila++)
-    lcd_actualizar(&mensajes[fila], textos[fila], xTaskGetTickCount() * portTICK_PERIOD_MS);
+    lcd_actualizar(&mensajes[fila], textos[fila], desplazar[fila], paso_ms[fila], xTaskGetTickCount() * portTICK_PERIOD_MS);
   lcd_disponible = true;
   xSemaphoreGive(mutex_lcd);
 
@@ -237,6 +240,8 @@ static void tarea_nube(void *arg) {
 
 static void tarea_lcd(void *arg) {
   (void)arg;
+  char enviadas[2][LCD_COLUMNAS + 1] = {{0}};
+  uint32_t ultimo_envio[2] = {0};
   for (;;) {
     TickType_t inicio = xTaskGetTickCount();
     char filas[2][LCD_COLUMNAS + 1];
@@ -247,14 +252,18 @@ static void tarea_lcd(void *arg) {
     xSemaphoreGive(mutex_lcd);
     if (enviar && !isp_activo()) {
       for (int f = 0; f < 2; f++) {
+        uint32_t ahora_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
+        if (strcmp(enviadas[f], filas[f]) == 0 && (uint32_t)(ahora_ms - ultimo_envio[f]) < 1000) continue;
         char linea[24], resp[64];
         formatear_m(linea, sizeof linea, f, filas[f]);
         // Reenviar tambien las filas quietas recupera el LCD tras un reset del ATmega.
         if (!entrenador_transaccion(linea, resp, sizeof resp)) break;
+        strcpy(enviadas[f], filas[f]);
+        ultimo_envio[f] = ahora_ms;
       }
     }
     TickType_t usado = xTaskGetTickCount() - inicio;
-    TickType_t periodo = pdMS_TO_TICKS(LCD_PASO_MS);
+    TickType_t periodo = pdMS_TO_TICKS(100);
     vTaskDelay(usado < periodo ? periodo - usado : pdMS_TO_TICKS(20));
   }
 }

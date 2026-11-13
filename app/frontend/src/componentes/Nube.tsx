@@ -9,8 +9,9 @@ import {
   configGuardada,
   escucharNube,
   fijarEntrada,
-  fijarTexto,
-  leerTextos,
+  fijarLcd,
+  leerLcd,
+  type FilaLcd,
   textoLcd,
   MAX_TEXTO_LCD,
   guardarConfig,
@@ -56,7 +57,10 @@ export function Nube({ conexion, onCerrar }: Props) {
   const [lecturas, setLecturas] = useState<Lectura[]>([])
   const [valor1, setValor1] = useState<number | null>(null)
   const [entradas, setEntradas] = useState<number[] | null>(null)
-  const [textos, setTextos] = useState<[string, string]>(['', ''])
+  const [filas, setFilas] = useState<[FilaLcd, FilaLcd]>([
+    { texto: '', desplazar: true, pasoMs: 400 },
+    { texto: '', desplazar: true, pasoMs: 400 },
+  ])
   const [enviado, setEnviado] = useState<string | null>(null)
   const [enVivo, setEnVivo] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -80,7 +84,7 @@ export function Nube({ conexion, onCerrar }: Props) {
       },
       (e) => vivo && setError(String(e.message ?? e)),
     )
-    leerTextos(config).then((t) => vivo && setTextos(t), () => {})
+    leerLcd(config).then((t) => vivo && setFilas(t), (e) => vivo && setError(String(e.message ?? e)))
     const dejar = escucharNube(
       config,
       (l) => setLecturas((ls) => [...ls.slice(-(MAX_PUNTOS - 1)), l]),
@@ -114,10 +118,15 @@ export function Nube({ conexion, onCerrar }: Props) {
   }
   const leds = entradas?.[1] ?? 0
   const enviarTextos = () =>
-    Promise.all([fijarTexto(config, 0, textos[0]), fijarTexto(config, 1, textos[1])]).then(
-      () => setEnviado('Texto guardado en la nube: el ESP32 lo lleva al entrenador en el próximo ciclo.'),
+    Promise.all([fijarLcd(config, 0, filas[0]), fijarLcd(config, 1, filas[1])]).then(
+      () => setEnviado('Texto y desplazamiento guardados en la nube: el ESP32 lo lleva al entrenador en el próximo ciclo.'),
       (e) => setError(String(e.message ?? e)),
     )
+
+  const cambiarFila = (fila: number, cambio: Partial<FilaLcd>) => {
+    setFilas((fs) => fila === 0 ? [{ ...fs[0], ...cambio }, fs[1]] : [fs[0], { ...fs[1], ...cambio }])
+    setEnviado(null)
+  }
 
   const ultima = lecturas.at(-1)
   const edad = ultima ? Math.round((ahora - new Date(ultima.creado_en).getTime()) / 1000) : null
@@ -146,7 +155,7 @@ export function Nube({ conexion, onCerrar }: Props) {
             <small>{edad === null ? 'sin lecturas' : edad <= 1 ? 'ahora' : `hace ${edad} s`}</small>
           </div>
           <div className="tablero-dato">
-            <span>VALOR1 (brillo del LED)</span>
+            <span>VALOR1 · brillo de los 8 LEDs</span>
             <strong className="mono">{valor1 ?? '—'}</strong>
             <input
               type="range"
@@ -159,6 +168,7 @@ export function Nube({ conexion, onCerrar }: Props) {
               onChange={(e) => cambiarValor1(Number(e.target.value))}
               aria-label="VALOR1"
             />
+            <small>0–100 %. El programa debe llamar brillo(nube(1)).</small>
           </div>
         </div>
 
@@ -210,25 +220,32 @@ export function Nube({ conexion, onCerrar }: Props) {
         </div>
         <div className="formulario">
           {[0, 1].map((f) => (
-            <label key={f} className="campo">
-              <span>LCD fila {f} · {textos[f].length}/{MAX_TEXTO_LCD}</span>
+            <div key={f} className="campo">
+              <label htmlFor={`lcd-texto-${f}`}>LCD fila {f} · {filas[f].texto.length}/{MAX_TEXTO_LCD}</label>
               <textarea
+                id={`lcd-texto-${f}`}
                 className="mono"
                 rows={3}
                 maxLength={MAX_TEXTO_LCD}
-                value={textos[f]}
-                onChange={(e) => {
-                  const t = textoLcd(e.target.value)
-                  setTextos((ts) => (f === 0 ? [t, ts[1]] : [ts[0], t]))
-                  setEnviado(null)
-                }}
+                value={filas[f].texto}
+                onChange={(e) => cambiarFila(f, { texto: textoLcd(e.target.value) })}
               />
-            </label>
+              <label className="lcd-desplazar">
+                <input type="checkbox" checked={filas[f].desplazar} onChange={(e) => cambiarFila(f, { desplazar: e.target.checked })} />
+                Desplazamiento automático · fila {f}
+              </label>
+              <label htmlFor={`lcd-velocidad-${f}`}>Velocidad · fila {f}</label>
+              <select id={`lcd-velocidad-${f}`} value={filas[f].pasoMs} disabled={!filas[f].desplazar} onChange={(e) => cambiarFila(f, { pasoMs: Number(e.target.value) })}>
+                <option value={800}>Lenta</option>
+                <option value={400}>Normal</option>
+                <option value={200}>Rápida</option>
+              </select>
+            </div>
           ))}
         </div>
-        <p className="nota">Los mensajes de más de 16 caracteres se desplazan automáticamente. Las tildes se convierten a letras simples.</p>
+        <p className="nota">El desplazamiento mueve los mensajes de más de 16 caracteres. Desactivado, muestra los primeros 16. Las tildes se convierten a letras simples.</p>
         <button type="button" className="primario" onClick={enviarTextos}>
-          Enviar texto al LCD
+          Aplicar al LCD
         </button>
         {enviado && <p className="chip chip-ok">{enviado}</p>}
 

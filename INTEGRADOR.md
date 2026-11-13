@@ -60,11 +60,20 @@ quedar abierto**: cerrado pone SDA a GND y el LCD no responde.
 ## Texto largo y programas por Wi-Fi
 
 En **Nube**, cada fila admite hasta **160 caracteres ASCII**. Los textos de hasta
-16 caracteres quedan quietos; los más largos se desplazan una columna cada 400 ms,
-con una pausa de 1,2 s al empezar y tres espacios entre vueltas. El ESP32 hace el
+16 caracteres quedan quietos. Cada fila tiene un interruptor de **Desplazamiento
+automático** y velocidad **Lenta** (800 ms), **Normal** (400 ms) o **Rápida** (200 ms).
+Pulsar **Aplicar al LCD** guarda texto y opciones. Desactivado, se muestran los primeros
+16 caracteres; activado, se avanza una columna por paso, con una pausa inicial de tres
+pasos y tres espacios entre vueltas. Las opciones se guardan en `lcd1_scroll`,
+`lcd2_scroll`, `lcd1_ms` y `lcd2_ms` de `controles`. El ESP32 hace el
 scroll, incluso con el navegador cerrado, y sigue usando el comando `M` de 16 columnas:
 no hace falta volver a grabar el ATmega. El programa debe llamar `lcd_nube(0)` y/o
 `lcd_nube(1)` periódicamente (como **Control desde la nube**).
+
+**VALOR1** controla el brillo de los ocho LEDs, no la luz del LCD. Es la entrada
+`nube(1)`: el programa debe ejecutar `brillo(nube(1))` dentro del bucle. El ejemplo
+**Control desde la nube** ya lo hace, además de elegir los LEDs con `nube(2)`.
+Los LEDs apagados en ese patrón permanecen apagados aunque se aumente el brillo.
 
 **Ejecutar por Wi-Fi** envía el programa del editor a la conexión elegida en **Nube**.
 No requiere USB: el ESP32 reclama la carga, envía `B`, bloques `D`, `E` y finalmente
@@ -85,7 +94,7 @@ muestre un error: comprobar la placa antes de volver a enviarlo.
    Desconectar antes la app del puerto. La imagen combinada en dirección 0 también
    incluye el espacio de NVS: reservarla para una instalación nueva.
 2. Aplicar las migraciones `20261114000000_lcd_desplazamiento.sql` y
-   `20261114010000_programar_wifi.sql` de `nube/supabase/migrations/`.
+   `20261114010000_programar_wifi.sql` y `20261114020000_controles_scroll_lcd.sql` de `nube/supabase/migrations/`.
    Conservan textos, controles y permisos existentes. Las cargas usan la misma
    política de demostración pública que los controles del proyecto.
 3. Publicar la app nueva. El firmware nuevo tolera que aún no exista la API de cargas;
@@ -97,7 +106,7 @@ anterior del ESP32 solo muestra los primeros 16 caracteres. Antes de restaurar e
 SQL de 16, exportar y revisar los mensajes que lo excedan; no truncarlos automáticamente.
 
 Pruebas: `firmware/esp32-puente/pruebas/correr.sh`, `(cd app/frontend && npm test && npm run build)`
-y `nube/pruebas/programar-wifi.sql` en una base de prueba con las migraciones aplicadas.
+y `nube/pruebas/programar-wifi.sql` / `nube/pruebas/scroll-lcd.sql` en una base de prueba con las migraciones aplicadas.
 
 ## Protocolo serie del entrenador (firmware/bloques, versión 2)
 

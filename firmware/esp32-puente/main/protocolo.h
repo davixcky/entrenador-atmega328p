@@ -65,10 +65,14 @@ void bytes_a_hex(const uint8_t *src, size_t n, char *dst);
 typedef struct {
   char texto[LCD_TEXTO_MAX + 1];
   uint32_t inicio_ms;
+  uint32_t paso_ms;
+  bool desplazar;
 } mensaje_lcd_t;
 
 // Releer el mismo mensaje no reinicia su desplazamiento.
-void lcd_actualizar(mensaje_lcd_t *m, const char *texto, uint32_t ahora_ms);
+void lcd_actualizar(mensaje_lcd_t *m, const char *texto, bool desplazar, uint32_t paso_ms, uint32_t ahora_ms);
+// Sin columnas de opciones (base anterior): true, 400 ms.
+bool parsear_opciones_lcd_json(const char *json, int fila, bool *desplazar, uint32_t *paso_ms);
 // Siempre 16 caracteres y terminador. Los mensajes cortos quedan quietos.
 void lcd_ventana(const mensaje_lcd_t *m, uint32_t ahora_ms, char salida[LCD_COLUMNAS + 1]);
 
@@ -99,7 +103,7 @@ int json_lectura(char *dst, size_t cap, const char *dispositivo, const int16_t s
                  const int16_t e[4]);
 // Codifica para la query (?dispositivo=eq.<id>). -1 si no cabe.
 int url_codificar(char *dst, size_t cap, const char *src);
-// {url}/rest/v1/controles?dispositivo=eq.{id}&select=entradas,lcd1,lcd2 (sin '/' doble).
+// Controles numericos, texto y opciones de desplazamiento (sin '/' doble).
 int url_controles(char *dst, size_t cap, const char *base, const char *dispositivo);
 int url_lecturas(char *dst, size_t cap, const char *base);
 

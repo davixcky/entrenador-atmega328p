@@ -325,3 +325,12 @@ test('lcd_nube: bytecode, Arduino y nodo del diagrama', () => {
   assert.ok(tipos.includes('lcd_nube'))
   assert.ok(!tipos.includes('llamada'))
 })
+
+
+test('control desde la nube conecta VALOR1 con el brillo de los LEDs', () => {
+  const ejemplo = ejemplos.find((e) => e.nombre === 'Control desde la nube')!
+  const sketch = generarArduino(analizar(ejemplo.codigo))
+  assert.match(sketch, /brillo\(nube\(1\)\);/)
+  assert.match(sketch, /leds\(nube\(2\)\);/)
+  assert.match(sketch, /mostrar\(nube\(3\)\);/)
+})

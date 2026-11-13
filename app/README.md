@@ -47,7 +47,9 @@ elige Supabase local o el alojado (`VITE_SUPABASE_URL_ALOJADO` en `nube/.env.loc
 La versión web permite **Ejecutar por Wi-Fi** con la conexión configurada en **Nube**:
 no hace falta conectar el USB. El ESP32 confirma la carga y el arranque del programa;
 esta acción no modifica la EEPROM. Los mensajes del LCD admiten 160 caracteres por
-fila y se desplazan automáticamente si no caben en 16 columnas. Requiere el firmware
+fila; cada fila permite activar el desplazamiento y elegir su velocidad. **VALOR1**
+cambia el brillo de los ocho LEDs cuando el programa llama `brillo(nube(1))`, como
+el ejemplo **Control desde la nube**. Requiere el firmware
 ESP32 y las migraciones descritas en [INTEGRADOR.md](../INTEGRADOR.md).
 
 ## Cómo funciona
