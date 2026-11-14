@@ -370,6 +370,27 @@ int json_lectura(char *dst, size_t cap, const char *dispositivo, const int16_t s
   return n + m;
 }
 
+int json_lectura_estado(char *dst, size_t cap, const char *dispositivo, const int16_t s[4],
+                        const int16_t e[4], const char *telemetria, const char *pantalla) {
+  int n = json_lectura(dst, cap, dispositivo, s, e);
+  if (n < 0) return -1;
+  n--; // reemplazar la llave final
+  const char *claves[2] = {"telemetria", "pantalla"};
+  const char *valores[2] = {telemetria, pantalla};
+  for (int i = 0; i < 2; i++) {
+    int m = snprintf(dst + n, cap - n, ",\"%s\":", claves[i]);
+    if (m < 0 || (size_t)(n + m) >= cap) return -1;
+    n += m;
+    m = valores[i] ? json_cadena(dst + n, cap - n, valores[i]) : snprintf(dst + n, cap - n, "null");
+    if (m < 0 || (size_t)(n + m) >= cap) return -1;
+    n += m;
+  }
+  if ((size_t)n + 2 > cap) return -1;
+  dst[n++] = '}';
+  dst[n] = '\0';
+  return n;
+}
+
 int url_codificar(char *dst, size_t cap, const char *src) {
   static const char digitos[] = "0123456789ABCDEF";
   size_t n = 0;

@@ -11,6 +11,7 @@ import { Firmware } from './componentes/Firmware'
 import { Generado } from './componentes/Generado'
 import { Nube } from './componentes/Nube'
 import { Placa, Telemetria } from './componentes/Placa'
+import { useTelemetriaWifi } from './useTelemetriaWifi'
 
 const MAX_REGISTRO = 200
 
@@ -48,6 +49,7 @@ export default function App() {
   const [conectando, setConectando] = useState(false)
   const [envioWifi, setEnvioWifi] = useState<string | null>(null)
   const [telemetria, setTelemetria] = useState<Telemetria | null>(null)
+  const wifi = useTelemetriaWifi()
   const [registro, setRegistro] = useState<string[]>([])
   const [aviso, setAviso] = useState<Aviso>(null)
   const [vista, setVista] = useState<Vista>(vistaGuardada)
@@ -217,6 +219,11 @@ export default function App() {
   }
 
   const listo = conexion.conectado && !!conexion.entrenador
+  const porUsb = listo && !!telemetria
+  const monitor = porUsb ? telemetria : wifi.t
+  const fuente = porUsb ? 'USB · en vivo' : wifi.vigente ? 'Wi-Fi · en vivo'
+    : wifi.configurada ? (wifi.fecha ? 'Wi-Fi · sin datos recientes' : 'Wi-Fi · esperando datos')
+    : 'Configura Nube o conecta el USB para ver la placa.'
 
   return (
     <div className="app">
@@ -257,8 +264,9 @@ export default function App() {
               {conectando ? 'Conectando...' : 'Conectar'}
             </button>
           )}
-          <span className={conexion.conectado ? 'chip chip-ok' : 'chip'}>Puente</span>
-          <span className={listo ? 'chip chip-ok' : conexion.conectado ? 'chip chip-error' : 'chip'}>Entrenador</span>
+          <span className={conexion.conectado ? 'chip chip-ok' : 'chip'}>Puente USB</span>
+          <span className={listo ? 'chip chip-ok' : conexion.conectado ? 'chip chip-error' : 'chip'}>Entrenador USB</span>
+          {wifi.configurada && <span className={wifi.vigente ? 'chip chip-ok' : 'chip'} title={fuente}>Wi-Fi</span>}
           <button type="button" onClick={() => setVerAjustes(true)} title="Luz y cursor del LCD, brillo de los LEDs: se agregan solos al programa">
             Ajustes
           </button>
@@ -376,7 +384,9 @@ export default function App() {
 
         <aside className="lateral">
           <Placa
-            t={telemetria}
+            t={monitor}
+            fuente={fuente}
+            detalleFuente={!porUsb && wifi.error ? wifi.error : undefined}
             habilitado={listo}
             onLeds={(v) => backend.ponerLeds(v).catch(fallo)}
             onNumero={(n) => (n === null ? backend.apagarDisplays() : backend.ponerNumero(n)).catch(fallo)}
@@ -389,7 +399,7 @@ export default function App() {
               </button>
             </header>
             <div className="registro-lineas mono">
-              {registro.length === 0 && <p className="nota">Conecta el puente (ESP32 o Uno) para empezar.</p>}
+              {registro.length === 0 && <p className="nota">Aquí aparecen las conexiones y las cargas de programas.</p>}
               {registro.map((l, i) => (
                 <div key={i}>{l}</div>
               ))}

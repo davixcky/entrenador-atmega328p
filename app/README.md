@@ -52,6 +52,14 @@ cambia el brillo de los ocho LEDs cuando el programa llama `brillo(nube(1))`, co
 el ejemplo **Control desde la nube**. Requiere el firmware
 ESP32 y las migraciones descritas en [INTEGRADOR.md](../INTEGRADOR.md).
 
+El panel **Entrenador** también muestra el estado real por Wi-Fi: LEDs, brillo,
+displays, texto visible del LCD, potenciómetro, DIP y ejecución. El ESP32 lo publica
+en cada ciclo de nube, aunque el programa no use `nube_enviar()`. La app prefiere
+USB si está conectado; sin USB usa Nube, con sondeo de respaldo cada 5 segundos.
+Después de 10 segundos sin una lectura reciente indica **sin datos recientes** y
+deja de mostrar esos valores como actuales. El control remoto se hace desde **Nube**;
+los botones manuales del panel requieren USB.
+
 ## Cómo funciona
 
 ```text

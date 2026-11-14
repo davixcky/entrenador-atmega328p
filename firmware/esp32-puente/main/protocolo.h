@@ -101,6 +101,9 @@ int formatear_m(char *dst, size_t cap, int fila, const char *texto);
 // {"dispositivo":"id","salidas":[...],"entradas":[...]}. -1 si no cabe.
 int json_lectura(char *dst, size_t cap, const char *dispositivo, const int16_t s[4],
                  const int16_t e[4]);
+// Agrega respuestas T y P (NULL si no respondieron), con escape JSON.
+int json_lectura_estado(char *dst, size_t cap, const char *dispositivo, const int16_t s[4],
+                        const int16_t e[4], const char *telemetria, const char *pantalla);
 // Codifica para la query (?dispositivo=eq.<id>). -1 si no cabe.
 int url_codificar(char *dst, size_t cap, const char *src);
 // Controles numericos, texto y opciones de desplazamiento (sin '/' doble).

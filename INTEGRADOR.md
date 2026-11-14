@@ -88,15 +88,16 @@ muestre un error: comprobar la placa antes de volver a enviarlo.
 
 ### Actualización desde la versión de 16 caracteres
 
-1. Compilar `firmware/esp32-puente/compilar.sh` y actualizar **solo la aplicación**
+1. Aplicar las migraciones `20261114000000_lcd_desplazamiento.sql`,
+   `20261114010000_programar_wifi.sql`, `20261114020000_controles_scroll_lcd.sql` y
+   `20261114030000_telemetria_wifi.sql` de `nube/supabase/migrations/`.
+   Conservan textos, controles y permisos existentes. Las cargas usan la misma
+   política de demostración pública que los controles del proyecto.
+2. Compilar `firmware/esp32-puente/compilar.sh` y actualizar **solo la aplicación**
    del ESP32 para conservar Wi-Fi y Supabase en NVS:
    `esptool.py --chip esp32 -p /dev/ttyUSB0 write_flash 0x10000 firmware/esp32-puente/dist/esp32-puente.bin`.
    Desconectar antes la app del puerto. La imagen combinada en dirección 0 también
    incluye el espacio de NVS: reservarla para una instalación nueva.
-2. Aplicar las migraciones `20261114000000_lcd_desplazamiento.sql` y
-   `20261114010000_programar_wifi.sql` y `20261114020000_controles_scroll_lcd.sql` de `nube/supabase/migrations/`.
-   Conservan textos, controles y permisos existentes. Las cargas usan la misma
-   política de demostración pública que los controles del proyecto.
 3. Publicar la app nueva. El firmware nuevo tolera que aún no exista la API de cargas;
    el ATmega y la app USB existentes siguen funcionando.
 
@@ -106,7 +107,15 @@ anterior del ESP32 solo muestra los primeros 16 caracteres. Antes de restaurar e
 SQL de 16, exportar y revisar los mensajes que lo excedan; no truncarlos automáticamente.
 
 Pruebas: `firmware/esp32-puente/pruebas/correr.sh`, `(cd app/frontend && npm test && npm run build)`
-y `nube/pruebas/programar-wifi.sql` / `nube/pruebas/scroll-lcd.sql` en una base de prueba con las migraciones aplicadas.
+y `nube/pruebas/programar-wifi.sql` / `nube/pruebas/scroll-lcd.sql` / `nube/pruebas/telemetria-wifi.sql`
+en una base de prueba con las migraciones aplicadas.
+
+Con ese firmware, el panel **Entrenador** recibe también el estado real por Wi-Fi:
+el puente consulta `T` y `P` en cada ciclo y guarda sus respuestas en `lecturas.telemetria`
+y `lecturas.pantalla`. No requiere que el programa publique valores con `nube_enviar()`.
+La app da prioridad al USB y, sin él, escucha Realtime con sondeo de respaldo cada 5 s.
+Una lectura de más de 10 s deja de mostrarse como actual. Las lecturas antiguas conservan
+ambas columnas en NULL; para desactivar esta función basta volver al firmware anterior.
 
 ## Protocolo serie del entrenador (firmware/bloques, versión 2)
 

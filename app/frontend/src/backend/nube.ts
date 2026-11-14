@@ -15,7 +15,11 @@ export interface Lectura {
   salidas: number[]
   entradas: number[]
   creado_en: string
+  telemetria?: string | null
+  pantalla?: string | null
 }
+
+export const CAMBIO_NUBE = 'entrenador:cambio-nube'
 
 const CLAVE_LOCAL = 'entrenador.nube'
 // Clave anon de cada URL: al pasar de local a alojado y volver no hay que pegarla otra vez
@@ -66,6 +70,7 @@ export function guardarConfig(c: ConfigNube) {
   } catch {
     // sin almacenamiento: vale para esta sesion
   }
+  window.dispatchEvent(new Event(CAMBIO_NUBE))
 }
 
 let cliente: { clave: string; sb: SupabaseClient } | null = null
@@ -88,10 +93,11 @@ export async function ultimasLecturas(c: ConfigNube, cuantas = 120): Promise<Lec
   const datos = comprobar(
     await supabase(c)
       .from('lecturas')
-      .select('id, salidas, entradas, creado_en')
+      .select('id, salidas, entradas, creado_en, telemetria, pantalla')
       .eq('dispositivo', c.dispositivo)
       .order('creado_en', { ascending: false })
-      .limit(cuantas),
+      .limit(cuantas)
+      .abortSignal(AbortSignal.timeout(10000)),
   )
   return (datos as Lectura[]).reverse()
 }
@@ -160,6 +166,8 @@ export async function fijarEntrada(c: ConfigNube, n: number, valor: number) {
 }
 
 // Avisa cada lectura nueva y cada cambio de controles. Devuelve la funcion para dejar de escuchar.
+let siguienteSuscripcion = 0
+
 export function escucharNube(
   c: ConfigNube,
   alLeer: (l: Lectura) => void,
@@ -169,7 +177,7 @@ export function escucharNube(
   const sb = supabase(c)
   const filtro = `dispositivo=eq.${c.dispositivo}`
   const canal = sb
-    .channel(`entrenador-${c.dispositivo}`)
+    .channel(`entrenador-${c.dispositivo}-${++siguienteSuscripcion}`)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lecturas', filter: filtro }, (p) => alLeer(p.new as Lectura))
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'controles', filter: filtro }, (p) =>
       alControlar((p.new as { entradas: number[] }).entradas),

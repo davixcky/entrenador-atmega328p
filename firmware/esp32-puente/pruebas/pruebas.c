@@ -1,5 +1,6 @@
 // Pruebas en la PC de main/protocolo.c (sin ESP-IDF). Correr con ./correr.sh
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "../main/protocolo.h"
@@ -315,6 +316,29 @@ static void probar_isp(void) {
   VERIFICAR(ins[0] == 0x4C && ins[1] == 0x3F && ins[2] == 0xC0 && ins[3] == 0);
 }
 
+static void probar_telemetria_wifi(void) {
+  char json[640];
+  const int16_t s[4] = {1, 2, 3, 4}, e[4] = {5, 6, 7, 8};
+  int n = json_lectura_estado(json, sizeof json, "placa", s, e, "T 512 3 129 42 1 0", "OK 1 27 texto");
+  VERIFICAR(n > 0 && (size_t)n == strlen(json));
+  VERIFICAR(strcmp(json, "{\"dispositivo\":\"placa\",\"salidas\":[1,2,3,4],\"entradas\":[5,6,7,8],\"telemetria\":\"T 512 3 129 42 1 0\",\"pantalla\":\"OK 1 27 texto\"}") == 0);
+  VERIFICAR(json_lectura_estado(json, sizeof json, "placa", s, e, NULL, NULL) > 0);
+  VERIFICAR(strstr(json, "\"telemetria\":null,\"pantalla\":null}") != NULL);
+  VERIFICAR(json_lectura_estado(json, sizeof json, "placa", s, e, "T \"\\\n", NULL) > 0);
+  VERIFICAR(strstr(json, "\"telemetria\":\"T \\\"\\\\\\u000a\"") != NULL);
+  // Cada punto de truncamiento debe fallar sin escribir fuera del buffer.
+  n = json_lectura_estado(json, sizeof json, "placa", s, e, "T 0 0 0 - 0 0", NULL);
+  bool truncados = true;
+  for (int cap = 0; cap <= n; cap++) {
+    char *corto = malloc((size_t)cap + 1);
+    corto[cap] = '!';
+    if (json_lectura_estado(corto, (size_t)cap, "placa", s, e, "T 0 0 0 - 0 0", NULL) != -1 || corto[cap] != '!') truncados = false;
+    free(corto);
+  }
+  VERIFICAR(truncados);
+  VERIFICAR(json_lectura_estado(json, (size_t)n + 1, "placa", s, e, "T 0 0 0 - 0 0", NULL) == n);
+}
+
 int main(void) {
   probar_lineas();
   probar_c();
@@ -324,6 +348,7 @@ int main(void) {
   probar_desplazamiento();
   probar_controles_lcd();
   probar_programa_wifi();
+  probar_telemetria_wifi();
   printf("%d de %d verificaciones pasaron\n", total - fallas, total);
   return fallas ? 1 : 0;
 }

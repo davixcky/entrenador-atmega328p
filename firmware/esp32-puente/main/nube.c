@@ -162,7 +162,7 @@ static bool cargas_wifi(void) {
 
 static bool ciclo(void) {
   static char url[sizeof cfg.url + 256];
-  static char json[160];
+  static char json[640];
   if (url_controles(url, sizeof url, cfg.url, cfg.dispositivo) < 0) return fallo("url", 0);
   if (!abrir_cliente(url)) return fallo("cliente", 0);
 
@@ -195,7 +195,14 @@ static bool ciclo(void) {
   xSemaphoreGive(mutex_lcd);
 
   if (url_lecturas(url, sizeof url, cfg.url) < 0) return fallo("url", 0);
-  if (json_lectura(json, sizeof json, cfg.dispositivo, s, e) < 0) return fallo("json", 0);
+  char telemetria[96], pantalla[128];
+  bool con_telemetria = entrenador_transaccion("T", telemetria, sizeof telemetria) &&
+                        strncmp(telemetria, "T ", 2) == 0;
+  bool con_pantalla = entrenador_transaccion("P", pantalla, sizeof pantalla) &&
+                      strncmp(pantalla, "OK ", 3) == 0;
+  if (json_lectura_estado(json, sizeof json, cfg.dispositivo, s, e,
+                         con_telemetria ? telemetria : NULL, con_pantalla ? pantalla : NULL) < 0)
+    return fallo("json", 0);
   codigo = pedir(url, HTTP_METHOD_POST, json);
   if (codigo < 200 || codigo >= 300) {
     // codigo y el comienzo de la respuesta, sin espacios (@? separa por espacios)

@@ -26,6 +26,8 @@ const ERRORES = ['', 'pila llena', 'pila vacía', 'instrucción inválida', 'sal
 
 interface Props {
   t: Telemetria | null
+  fuente?: string
+  detalleFuente?: string
   habilitado: boolean
   onLeds: (valor: number) => void
   onNumero: (valor: number | null) => void
@@ -71,7 +73,7 @@ function Lcd({ pantalla }: { pantalla: Pantalla | null }) {
   )
 }
 
-export function Placa({ t, habilitado, onLeds, onNumero }: Props) {
+export function Placa({ t, fuente, detalleFuente, habilitado, onLeds, onNumero }: Props) {
   const [numeroManual, setNumeroManual] = useState('42')
   const [decenas, unidades] = segmentosDe(t?.numero ?? null)
   const leds = t?.leds ?? 0
@@ -104,6 +106,7 @@ export function Placa({ t, habilitado, onLeds, onNumero }: Props) {
         <h2>Entrenador</h2>
         <span className={claseEstado}>{estado}</span>
       </header>
+      {fuente && <p className="nota" title={detalleFuente} aria-live="polite">{fuente}</p>}
 
       <div className="placa-salidas">
         <div
@@ -137,7 +140,7 @@ export function Placa({ t, habilitado, onLeds, onNumero }: Props) {
       </div>
 
       <Lcd pantalla={pantalla} />
-      {brillo < 100 && (
+      {pantalla && (
         <p className="nota">
           Brillo de los LEDs: <span className="mono">{brillo} %</span>
         </p>
@@ -190,6 +193,7 @@ export function Placa({ t, habilitado, onLeds, onNumero }: Props) {
           {leds ? 'Apagar LEDs' : 'Encender LEDs'}
         </button>
       </div>
+      {t && !habilitado && <p className="nota">Controla por Wi-Fi desde Nube. Los controles manuales de este panel requieren USB.</p>}
       {t?.corriendo && <p className="nota">El programa en marcha puede sobrescribir lo que cambies a mano.</p>}
     </section>
   )
